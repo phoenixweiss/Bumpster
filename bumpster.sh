@@ -5,6 +5,21 @@
 # TODO: make the code comply with the requirement
 # set -u
 
+### Begin define variables ###
+
+# Great idea to safely define home by Ben Hoskings, author of "babushka" https://github.com/benhoskings/babushka
+home=$(sh -c "echo ~$(whoami)")
+# Checks OS type
+ostype=$(uname -s)
+# Source
+from="https://github.com/phoenixweiss/bumpster"
+# Destination
+to="$home/.bumpster"
+# Full path to the "config" file in the ".git" folder
+config_path=".git/config"
+
+### End define variables ###
+
 # This function is defined to print an error message
 # and exit with a status code of 1.
 abort() {
@@ -33,19 +48,6 @@ if [ -z "${BASH_VERSION:-}" ]
 then
   abort "Bash is required to run this script."
 fi
-
-### Begin define variables ###
-
-# Great idea to safely define home by Ben Hoskings, author of "babushka" https://github.com/benhoskings/babushka
-home=$(sh -c "echo ~$(whoami)")
-# Checks OS type
-ostype=$(uname -s)
-# Source
-from="https://github.com/phoenixweiss/bumpster"
-# Destination
-to="$home/.bumpster"
-
-### End define variables ###
 
 # The usage() function is defined to display a usage message
 # when the script is called with the -h or --help options.
@@ -90,20 +92,20 @@ do
   esac
 done
 
-# Checking for git flow
-if ! which git-flow >/dev/null 2>&1
+# Checking if the git flow repository is initialized
+if ! git rev-parse --git-dir >/dev/null 2>&1
+then
+  abort "Git repository not found. Please initialize git first."
+fi
+
+# Checking if git flow installed
+if ! which git-flow >/dev/null 2>&1 || ! git flow version >/dev/null 2>&1
 then
   abort "Error: git flow is not installed. Please install it and try again."
 fi
 
-# Checking if the git flow repository is initialized
-if ! git rev-parse --git-dir >/dev/null 2>&1
-then
-  abort "Git repository not found. Please initialize git flow first."
-fi
-
-# Checking if git flow is initialized in the repository
-if ! git flow version >/dev/null 2>&1
+# Check if the word "gitflow" is present in the "config" file
+if ! grep -q "gitflow" "$config_path"
 then
   abort "Git flow is not initialized. Please run 'git flow init' first."
 fi

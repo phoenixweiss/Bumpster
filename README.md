@@ -1,6 +1,13 @@
-![BUMPSTER_LOGO](/lib/BUMPSTER_LOGO.ASCII)
-
 # Bumpster
+
+```ascii
+    _____                                 __
+   / _  / __  __ ____ ___   ____   _____ / /_ ___   _____
+  / __  |/ / / // __ `__ \ / __ \ / ___// __// _ \ / ___/
+ / /_/ // /_/ // / / / / // /_/ /(__  )/ /_ / ___// /
+/_____/ \__,_//_/ /_/ /_// .___//____/ \__/ \___//_/
+                        /_/
+```
 
 [RUSSIAN VERSION](README_RU.md)
 
@@ -20,6 +27,8 @@ Many features are planned for upcoming releases.
 - [awk](https://wikipedia.org/wiki/AWK)
 
 Before use, make sure to give execute permissions: `chmod +x bumpster.sh`.
+
+Also, you need to make sure that `git-flow` is installed and initialized using `git flow init`.
 
 The script `bumpster.sh` pulls the current version tag of the application from the `VERSION` file and bumps it. The script asks what needs to be bumped: major, minor, or patch version (by default).
 
