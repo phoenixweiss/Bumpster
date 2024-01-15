@@ -98,15 +98,43 @@ then
   abort "Git repository not found. Please initialize git first."
 fi
 
+# Checking for uncommitted changes
+if [[ -n $(git status --porcelain) ]]
+then
+  abort "Working tree contains unstaged changes. Aborting."
+fi
+
 # Checking if git flow installed
 if ! which git-flow >/dev/null 2>&1 || ! git flow version >/dev/null 2>&1
 then
   abort "Error: git flow is not installed. Please install it and try again."
 fi
 
-# Check if the word "gitflow" is present in the "config" file
-if ! grep -q "gitflow" "$config_path"
+# Check if the block [gitflow "branch"] is present in the "config" file
+if grep -q "\[gitflow \"branch\"\]" "$config_path"
 then
+  # Find string 'master = <value>' and assign it to gf_master_branch_name
+  gf_master_branch_name=$(grep -oP 'master\s*=\s*\K.*' "$config_path" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+
+  # Find string 'develop = <value>' and assign it to gf_develop_branch_name
+  gf_develop_branch_name=$(grep -oP 'develop\s*=\s*\K.*' "$config_path" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+
+  # Check that the gf_master_branch_name variable is not empty
+  if [[ -n $gf_master_branch_name ]]
+  then
+    echo "Git flow master branch name: $gf_master_branch_name"
+  else
+    abort "String 'master = <value>' did not found. Please run 'git flow init' first."
+  fi
+
+  # Check that the gf_develop_branch_name variable is not empty
+  if [[ -n $gf_develop_branch_name ]]
+  then
+    echo "Git flow develop branch name: $gf_develop_branch_name"
+  else
+    abort "String 'develop = <value>' did not found. Please run 'git flow init' first."
+  fi
+else
   abort "Git flow is not initialized. Please run 'git flow init' first."
 fi
 
@@ -149,11 +177,11 @@ git add VERSION
 git commit -m "bump version to $new_version" -m "Automatic version bump to $new_version"
 
 # Create a release branch from the develop branch in accordance with Git Flow
-git checkout develop
+git checkout $gf_develop_branch_name
 git flow release start $new_version
 
 # We complete the release branch and create a tag for the new version
 GIT_MERGE_AUTOEDIT=no git flow release finish -m "Release $new_version" -m "Automatic release $new_version" $new_version
 
 # Push changes to the server
-git push origin develop && git push origin master --tags
+git push origin $gf_develop_branch_name && git push origin $gf_master_branch_name --tags
