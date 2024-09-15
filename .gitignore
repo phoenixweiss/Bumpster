@@ -1,2 +1,3 @@
 # dotenv environment variables file
 .env
+bumpster.log
