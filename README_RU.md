@@ -85,7 +85,7 @@ bumpster -p
 
 ```bash
 bumpster --version
-# or
+# или
 bumpster -v
 ```
 
@@ -95,9 +95,23 @@ bumpster -v
 
 ```bash
 bumpster --help
-# or
+# или
 bumpster -h
 ```
+
+Если доступна более новая версия, она будет указана рядом с номером версии в выводе справки.
+
+### Обновление Bumpster
+
+Чтобы обновить Bumpster до последней версии, выполните:
+
+```bash
+bumpster --update
+# или
+bumpster -u
+```
+
+Это загрузит и заменит существующую установку последней версией.
 
 ### Настройка имён веток
 
@@ -163,16 +177,6 @@ ENABLE_LOGGING="true"
 ```bash
 git flow init
 ```
-
-## Обновление Bumpster
-
-Для обновления Bumpster просто выполните команду установки снова:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/bumpster/main/install.sh)"
-```
-
-Это скачает и заменит существующую установку на последнюю версию.
 
 ## Удаление Bumpster
 
