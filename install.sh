@@ -24,39 +24,28 @@ mkdir -p "$bin_dir" "$lib_dir"
 echo "Downloading and installing the latest version of Bumpster..."
 curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$install_dir"
 
+# Move bumpster.sh to bin directory if not already there
+if [ ! -f "$bin_dir/bumpster.sh" ]; then
+  mv "$install_dir/bumpster.sh" "$bin_dir/"
+fi
+
 # Make the script executable
 chmod +x "$bin_dir/bumpster.sh"
 
-# Determine the correct shell configuration file
-if [[ "$ostype" == "MINGW"* || "$ostype" == "CYGWIN"* ]]; then
-  # For Git Bash on Windows, use ~/.bash_profile
-  shell_config="$home/.bash_profile"
+# Check if the bin directory is already in the PATH
+if [[ ":$PATH:" == *":$bin_dir:"* ]]; then
+  echo "Bumpster's bin directory is already in your PATH."
 else
-  # For Unix-like systems, use ~/.bashrc or ~/.zshrc
-  if [ -f "$home/.bashrc" ]; then
-    shell_config="$home/.bashrc"
-    elif [ -f "$home/.zshrc" ]; then
-    shell_config="$home/.zshrc"
-  else
-    # Default to ~/.bashrc if no shell config is found
-    shell_config="$home/.bashrc"
-    touch "$shell_config"
-  fi
+  echo "Bumpster has been installed successfully in $bin_dir."
+  echo "However, to use Bumpster from any directory, you need to add it to your PATH."
+  echo ""
+  echo "Please manually add the following line to your shell configuration file (e.g., ~/.bashrc or ~/.bash_profile):"
+  echo ""
+  echo "  export PATH=\"$bin_dir:\$PATH\""
+  echo ""
+  echo "Then, reload your shell configuration by running:"
+  echo "  source ~/.bashrc  # or the equivalent for your shell"
 fi
-
-# Add Bumpster to PATH if it's not already present
-if ! grep -q "$bin_dir" "$shell_config"; then
-  echo "export PATH=\"$bin_dir:\$PATH\"" >> "$shell_config"
-  echo "Bumpster has been added to your PATH in $shell_config."
-else
-  echo "Bumpster is already in your PATH."
-fi
-
-# Provide instructions for adding Bumpster to PATH
-echo "Bumpster installed successfully in $bin_dir!"
-echo "To use Bumpster, add the following line to your shell configuration file (if not already added):"
-echo "  export PATH=\"$bin_dir:\$PATH\""
-echo "Then, run 'source $shell_config' (or the equivalent for your shell) to reload the environment."
 
 # Check version information
 if [ -f "$install_dir/VERSION" ]; then
@@ -72,4 +61,4 @@ if [ -f "$install_dir/VERSION" ]; then
 fi
 
 # Final message
-echo "Bumpster installation completed. You can now use the 'bumpster' command from any directory after adding it to your PATH."
+echo "Bumpster installation completed."
