@@ -91,10 +91,16 @@ load_config() {
 
 # Function to perform post-installation steps
 post_install() {
-  # Copy bumpster.sh to bin directory without the .sh extension
-  cp "$BUMPSTER_HOME/bumpster.sh" "$bin_dir/bumpster"
+  # Create the bin directory if it doesn't exist
+  mkdir -p "$bin_dir"
 
-  # Make the script executable
+  # Create the wrapper script in bin_dir
+  cat > "$bin_dir/bumpster" <<EOF
+#!/bin/bash
+"\$HOME/.bumpster/bumpster.sh" "\$@"
+EOF
+
+  # Make the wrapper script executable
   chmod +x "$bin_dir/bumpster"
 }
 
@@ -131,10 +137,6 @@ update_bumpster() {
     # Replace the old files with the new ones
     rm -rf "$BUMPSTER_HOME"
     mv "$temp_dir" "$BUMPSTER_HOME"
-
-    # Source config and functions (since BUMPSTER_HOME has been updated)
-    source "$BUMPSTER_HOME/config.sh"
-    source "$BUMPSTER_HOME/lib/functions.sh"
 
     # Perform post-installation steps
     post_install

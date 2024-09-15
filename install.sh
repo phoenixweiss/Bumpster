@@ -23,8 +23,8 @@ echo "Downloading and installing the latest version of Bumpster..."
 curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$BUMPSTER_HOME"
 
 # Source functions.sh
-source "$BUMPSTER_HOME/lib/functions.sh"
 source "$BUMPSTER_HOME/config.sh"
+source "$BUMPSTER_HOME/lib/functions.sh"
 
 # Perform post-installation steps
 post_install
