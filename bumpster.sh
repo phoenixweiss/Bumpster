@@ -76,6 +76,19 @@ EOF
   echo "Configuration file '$config_file' created."
 }
 
+# Function to create a local config file in the current directory
+create_local_config_file() {
+  local current_dir=$(pwd)
+  local local_config_file="$current_dir/.bumpsterrc"
+
+  if [ -f "$local_config_file" ]; then
+    echo "Local configuration file already exists at $local_config_file."
+  else
+    interactive_setup
+    echo "Local configuration file created at $local_config_file."
+  fi
+}
+
 # Function to run an interactive session for configuration
 interactive_setup() {
   echo "Welcome to Bumpster setup!"
@@ -87,7 +100,7 @@ interactive_setup() {
 
   read -p "Enable logging? (y/n) [default: no]: " logging_input
   logging_enabled="false"
-  if [[ "$logging_input" == "y" || "$logging_input" == "Y" ]]; then
+  if [[ "$logging_input" == "y" || "$logging_input" == "Y" || "$logging_input" == "yes" || "$logging_input" == "Yes" ]]; then
     logging_enabled="true"
   fi
 
@@ -128,17 +141,20 @@ usage() {
   cat <<EOS
 Bumpster $(display_version)
 Usage:  bumpster [options]
-        -h, --help      Display this message
-        -M, --major     Bump major version
-        -m, --minor     Bump minor version
-        -p, --patch     Bump patch version
-        --version       Display the current version of Bumpster
+        -h, --help               Display this message
+        -M, --major              Bump major version
+        -m, --minor              Bump minor version
+        -p, --patch              Bump patch version
+        --version                Display the current version of Bumpster
+        --create-local-config    Create a local configuration file in the current directory
 EOS
   exit "${1:-0}"
 }
 
+
 # Check command-line options
 version_type=""
+create_local_config=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)    usage ;;
@@ -147,11 +163,18 @@ while [[ $# -gt 0 ]]; do
     -M | --major )  version_type="major" ;;
     -m | --minor )  version_type="minor" ;;
     -p | --patch )  version_type="patch" ;;
+    --create-local-config ) create_local_config="true" ;;
     *)              printf "Unknown option: '$1'\n" >&2
     usage 1 ;;
   esac
   shift
 done
+
+# Create local configuration file if the option was passed
+if [[ "$create_local_config" == "true" ]]; then
+  create_local_config_file
+  exit 0
+fi
 
 # Ensure Bash is available
 if [ -z "${BASH_VERSION:-}" ]; then
