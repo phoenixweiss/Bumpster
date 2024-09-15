@@ -2,8 +2,8 @@
 
 # Function to display the version of Bumpster
 display_version() {
-  if [ -f "$version_file" ]; then
-    cat "$version_file"
+  if [ -f "$local_version_file" ]; then
+    cat "$local_version_file"
   else
     echo "Version information not available."
   fi
@@ -89,6 +89,62 @@ load_config() {
   fi
 }
 
+# Function to perform post-installation steps
+post_install() {
+  # Copy bumpster.sh to bin directory without the .sh extension
+  cp "$BUMPSTER_HOME/bumpster.sh" "$bin_dir/bumpster"
+
+  # Make the script executable
+  chmod +x "$bin_dir/bumpster"
+}
+
+# Function to update Bumpster to the latest version
+update_bumpster() {
+  local remote_version
+  local local_version
+
+  # Check if VERSION file exists
+  if [ -f "$local_version_file" ]; then
+    local_version=$(cat "$local_version_file")
+  else
+    echo "Local version information not available."
+    local_version="0.0.0"
+  fi
+
+  # Fetch the remote version
+  remote_version=$(curl -s "$remote_version_file")
+
+  # Compare versions
+  if [ "$local_version" != "$remote_version" ]; then
+    echo "Updating Bumpster from version $local_version to $remote_version..."
+
+    # Create a backup
+    local backup_dir="$BUMPSTER_HOME.backup.$local_version"
+    cp -r "$BUMPSTER_HOME" "$backup_dir"
+    echo "Backup of the current version created at $backup_dir."
+
+    # Download and extract the latest version to a temporary directory
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$temp_dir"
+
+    # Replace the old files with the new ones
+    rm -rf "$BUMPSTER_HOME"
+    mv "$temp_dir" "$BUMPSTER_HOME"
+
+    # Source config and functions (since BUMPSTER_HOME has been updated)
+    source "$BUMPSTER_HOME/config.sh"
+    source "$BUMPSTER_HOME/lib/functions.sh"
+
+    # Perform post-installation steps
+    post_install
+
+    echo "Bumpster has been updated to version $remote_version."
+  else
+    echo "You are already using the latest version of Bumpster ($local_version)."
+  fi
+}
+
 # Function to show usage and version information
 usage() {
   if [ -f "$logo_file" ]; then
@@ -101,10 +157,11 @@ usage() {
 Bumpster $(display_version)
 Usage:  bumpster [options]
         -h, --help               Display this message
+        -v, --version            Display the current version of Bumpster
         -M, --major              Bump major version
         -m, --minor              Bump minor version
         -p, --patch              Bump patch version
-        -v, --version            Display the current version of Bumpster
+        -u, --update             Update Bumpster to the latest version
         --create-local-config    Create a local configuration file in the current directory
 EOS
   exit "${1:-0}"
