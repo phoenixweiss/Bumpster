@@ -55,29 +55,29 @@ Once installed, Bumpster is available as a command-line tool. You can bump your 
 
 ### Bumping Versions
 
-- **Bump major version**:
+**Bump major version**:
 
-  ```bash
-  bumpster --major
-  # or
-  bumpster -M
-  ```
+```bash
+bumpster --major
+# or
+bumpster -M
+```
 
-- **Bump minor version**:
+**Bump minor version**:
 
-  ```bash
-  bumpster --minor
-  # or
-  bumpster -m
-  ```
+```bash
+bumpster --minor
+# or
+bumpster -m
+```
 
-- **Bump patch version**:
+**Bump patch version**:
 
-  ```bash
-  bumpster --patch
-  # or
-  bumpster -p
-  ```
+```bash
+bumpster --patch
+# or
+bumpster -p
+```
 
 ### Display Version
 
@@ -120,6 +120,16 @@ ENABLE_LOGGING="true"
 ```
 
 Once enabled, Bumpster will create and append logs to `bumpster.log` in the current directory.
+
+### Creating a local configuration file
+
+To create a local `.bumpsterrc` configuration file in your current project directory, run:
+
+```bash
+bumpster --create-local-config
+```
+
+This will guide you through an interactive setup process and generate a `.bumpsterrc` file in the current directory.
 
 ## Configuration
 
