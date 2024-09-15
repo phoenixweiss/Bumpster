@@ -4,11 +4,9 @@
 
 ### Begin define variables ###
 home=$(sh -c "echo ~$(whoami)")  # Define user's home directory
-install_dir="$home/.bumpster"    # Directory where Bumpster will be installed
-bin_dir="$install_dir/bin"       # Directory for binary files
-lib_dir="$install_dir/lib"       # Directory for library files
+BUMPSTER_HOME="$home/.bumpster"  # Directory where Bumpster will be installed
+bin_dir="$BUMPSTER_HOME/bin"     # Directory for binary files
 version_url="https://github.com/phoenixweiss/bumpster/archive/refs/heads/main.tar.gz" # GitHub archive URL
-ostype=$(uname -s)               # Detect the OS type
 ### End define variables ###
 
 # Check for required tools
@@ -18,19 +16,17 @@ if ! command -v curl &> /dev/null; then
 fi
 
 # Create the necessary directories if they do not exist
-mkdir -p "$bin_dir" "$lib_dir"
+mkdir -p "$bin_dir"
 
 # Download and extract the latest version of Bumpster from GitHub
 echo "Downloading and installing the latest version of Bumpster..."
-curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$install_dir"
+curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$BUMPSTER_HOME"
 
-# Move bumpster.sh to bin directory if not already there
-if [ ! -f "$bin_dir/bumpster.sh" ]; then
-  mv "$install_dir/bumpster.sh" "$bin_dir/"
-fi
+# Copy bumpster.sh to bin directory without the .sh extension
+cp "$BUMPSTER_HOME/bumpster.sh" "$bin_dir/bumpster"
 
 # Make the script executable
-chmod +x "$bin_dir/bumpster.sh"
+chmod +x "$bin_dir/bumpster"
 
 # Check if the bin directory is already in the PATH
 if [[ ":$PATH:" == *":$bin_dir:"* ]]; then
@@ -48,8 +44,8 @@ else
 fi
 
 # Check version information
-if [ -f "$install_dir/VERSION" ]; then
-  local_version=$(cat "$install_dir/VERSION")
+if [ -f "$BUMPSTER_HOME/VERSION" ]; then
+  local_version=$(cat "$BUMPSTER_HOME/VERSION")
   remote_version=$(curl -s https://raw.githubusercontent.com/phoenixweiss/bumpster/main/VERSION)
 
   if [ "$local_version" != "$remote_version" ]; then

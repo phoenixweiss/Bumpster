@@ -5,13 +5,12 @@ set -u
 
 ### Begin define variables ###
 
-# Home and project paths
-home=$(sh -c "echo ~$(whoami)")
-project_dir=$(pwd)
+# Define the home directory of Bumpster
+BUMPSTER_HOME="${BUMPSTER_HOME:-$HOME/.bumpster}"
 
 # Global and local config file paths
-global_config_file="$home/.bumpsterrc"
-local_config_file="$project_dir/.bumpsterrc"
+global_config_file="$BUMPSTER_HOME/.bumpsterrc"
+local_config_file="$(pwd)/.bumpsterrc"
 
 # Default values
 default_master_branch="master"
@@ -24,7 +23,10 @@ develop_branch=""
 logging_enabled=""
 
 # Define version file location
-version_file="$home/.bumpster/VERSION"
+version_file="$BUMPSTER_HOME/VERSION"
+
+# Define the path to the Bumpster logo file
+logo_file="$BUMPSTER_HOME/lib/BUMPSTER_LOGO.ASCII"
 
 ### End define variables ###
 
@@ -104,7 +106,7 @@ load_config() {
 }
 
 # Check if either local or global config exists, load the local config first
-if [ -f "$local_config_file" ]; then
+if [ -f "$local_config_file" ];then
   echo "Using local configuration from '$local_config_file'."
   load_config "$local_config_file"
   elif [ -f "$global_config_file" ]; then
@@ -117,10 +119,15 @@ fi
 
 # Function to show usage and version information
 usage() {
-  cat ./lib/BUMPSTER_LOGO.ASCII
+  if [ -f "$logo_file" ]; then
+    cat "$logo_file"
+  else
+    echo "Bumpster"
+  fi
+
   cat <<EOS
 Bumpster $(display_version)
-Usage:  ./bumpster.sh [options]
+Usage:  bumpster [options]
         -h, --help      Display this message
         -M, --major     Bump major version
         -m, --minor     Bump minor version
@@ -153,7 +160,7 @@ fi
 
 # Ensure necessary commands are available
 for cmd in git git-flow; do
-  if ! which "$cmd" >/dev/null 2>&1; then
+  if ! command -v "$cmd" >/dev/null 2>&1; then
     abort "Error: $cmd is not installed. Please install it and try again."
   fi
 done
@@ -186,7 +193,7 @@ if [ -f "VERSION" ]; then
   echo "Current version is $current_version"
 else
   current_version="0.0.1"
-  printf $current_version > VERSION
+  printf "$current_version" > VERSION
   echo "The VERSION file is created and filled with the value $current_version"
 fi
 
@@ -216,7 +223,7 @@ if [[ "$current_version" == "$new_version" ]]; then
 fi
 
 # Update the VERSION file and create a commit
-printf $new_version > VERSION
+printf "$new_version" > VERSION
 git add VERSION
 git commit -m "bump version to $new_version" -m "Automatic version bump to $new_version"
 log "Bumping version to $new_version"
