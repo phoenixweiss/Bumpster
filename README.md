@@ -85,6 +85,8 @@ To display the current version of Bumpster:
 
 ```bash
 bumpster --version
+# or
+bumpster -v
 ```
 
 ### Display Help
@@ -93,6 +95,8 @@ To display help and see available options:
 
 ```bash
 bumpster --help
+# or
+bumpster -h
 ```
 
 ### Customizing Branch Names

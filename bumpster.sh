@@ -1,171 +1,23 @@
 #!/bin/bash
 
-# Enable strict mode
-set -u
+# Source configuration and function files
+source "$(dirname "$0")/config.sh"
+source "$(dirname "$0")/lib/functions.sh"
 
-### Begin define variables ###
-
-# Define the home directory of Bumpster
-BUMPSTER_HOME="${BUMPSTER_HOME:-$HOME/.bumpster}"
-
-# Global and local config file paths
-global_config_file="$BUMPSTER_HOME/.bumpsterrc"
-local_config_file="$(pwd)/.bumpsterrc"
-
-# Default values
-default_master_branch="master"
-default_develop_branch="develop"
-default_logging="false"
-
-# Config variables
-master_branch=""
-develop_branch=""
-logging_enabled=""
-
-# Define version file location
-version_file="$BUMPSTER_HOME/VERSION"
-
-# Define the path to the Bumpster logo file
-logo_file="$BUMPSTER_HOME/lib/BUMPSTER_LOGO.ASCII"
-
-### End define variables ###
-
-# Function to display the version of Bumpster
-display_version() {
-  if [ -f "$version_file" ]; then
-    cat "$version_file"
-  else
-    echo "Version information not available."
-  fi
-}
-
-# Function to print an error message and exit with a status code of 1.
-abort() {
-  printf "%s\n" "$@" >&2
-  exit 1
-}
-
-# Function to log actions if logging is enabled
-log() {
-  if [[ "$logging_enabled" == "true" ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> bumpster.log
-  fi
-}
-
-# Function to create a config file with the given path and values
-create_config() {
-  local config_file="$1"
-  local master_branch="$2"
-  local develop_branch="$3"
-  local logging="$4"
-
-  # Use a clean and correctly formatted here-document
-  cat > "$config_file" <<EOF
-# Bumpster configuration file
-# You can change the values here to configure the behavior of Bumpster
-
-# Git master branch (default: master)
-GIT_MASTER_BRANCH="$master_branch"
-
-# Git develop branch (default: develop)
-GIT_DEVELOP_BRANCH="$develop_branch"
-
-# Enable or disable logging (default: false)
-ENABLE_LOGGING="$logging"
-EOF
-  echo "Configuration file '$config_file' created."
-}
-
-# Function to create a local config file in the current directory
-create_local_config_file() {
-  local current_dir=$(pwd)
-  local local_config_file="$current_dir/.bumpsterrc"
-
-  if [ -f "$local_config_file" ]; then
-    echo "Local configuration file already exists at $local_config_file."
-  else
-    interactive_setup
-    echo "Local configuration file created at $local_config_file."
-  fi
-}
-
-# Function to run an interactive session for configuration
-interactive_setup() {
-  echo "Welcome to Bumpster setup!"
-  read -p "Enter the name for the master branch [default: $default_master_branch]: " master_branch_input
-  master_branch=${master_branch_input:-$default_master_branch}
-
-  read -p "Enter the name for the develop branch [default: $default_develop_branch]: " develop_branch_input
-  develop_branch=${develop_branch_input:-$default_develop_branch}
-
-  read -p "Enable logging? (y/n) [default: no]: " logging_input
-  logging_enabled="false"
-  if [[ "$logging_input" == "y" || "$logging_input" == "Y" || "$logging_input" == "yes" || "$logging_input" == "Yes" ]]; then
-    logging_enabled="true"
-  fi
-
-  # Create the global config file based on user input
-  create_config "$global_config_file" "$master_branch" "$develop_branch" "$logging_enabled"
-}
-
-# Function to load configuration from a config file
-load_config() {
-  if [ -f "$1" ]; then
-    source "$1"
-    master_branch="${GIT_MASTER_BRANCH:-$default_master_branch}"
-    develop_branch="${GIT_DEVELOP_BRANCH:-$default_develop_branch}"
-    logging_enabled="${ENABLE_LOGGING:-$default_logging}"
-  fi
-}
-
-# Check if either local or global config exists, load the local config first
-if [ -f "$local_config_file" ];then
-  echo "Using local configuration from '$local_config_file'."
-  load_config "$local_config_file"
-  elif [ -f "$global_config_file" ]; then
-  echo "Using global configuration from '$global_config_file'."
-  load_config "$global_config_file"
-else
-  echo "No configuration file found."
-  interactive_setup
-fi
-
-# Function to show usage and version information
-usage() {
-  if [ -f "$logo_file" ]; then
-    cat "$logo_file"
-  else
-    echo "Bumpster"
-  fi
-
-  cat <<EOS
-Bumpster $(display_version)
-Usage:  bumpster [options]
-        -h, --help               Display this message
-        -M, --major              Bump major version
-        -m, --minor              Bump minor version
-        -p, --patch              Bump patch version
-        --version                Display the current version of Bumpster
-        --create-local-config    Create a local configuration file in the current directory
-EOS
-  exit "${1:-0}"
-}
-
-
-# Check command-line options
+# Process command-line options
 version_type=""
 create_local_config=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)    usage ;;
-    --version)      echo "Bumpster version: $(display_version)"
-    exit 0 ;;
-    -M | --major )  version_type="major" ;;
-    -m | --minor )  version_type="minor" ;;
-    -p | --patch )  version_type="patch" ;;
-    --create-local-config ) create_local_config="true" ;;
-    *)              printf "Unknown option: '$1'\n" >&2
-    usage 1 ;;
+    -h | --help)              usage ;;
+    -v | --version)           echo "Bumpster version: $(display_version)"
+                              exit 0 ;;
+    -M | --major )            version_type="major" ;;
+    -m | --minor )            version_type="minor" ;;
+    -p | --patch )            version_type="patch" ;;
+    --create-local-config )   create_local_config="true" ;;
+    *)                        printf "Unknown option: '$1'\n" >&2
+                              usage 1 ;;
   esac
   shift
 done
@@ -174,6 +26,18 @@ done
 if [[ "$create_local_config" == "true" ]]; then
   create_local_config_file
   exit 0
+fi
+
+# Check if either local or global config exists, load the local config first
+if [ -f "$local_config_file" ]; then
+  echo "Using local configuration from '$local_config_file'."
+  load_config "$local_config_file"
+elif [ -f "$global_config_file" ]; then
+  echo "Using global configuration from '$global_config_file'."
+  load_config "$global_config_file"
+else
+  echo "No configuration file found."
+  interactive_setup
 fi
 
 # Ensure Bash is available
@@ -200,8 +64,8 @@ fi
 
 # Check if git flow is initialized and get branch names
 if grep -q "\[gitflow \"branch\"\]" ".git/config"; then
-  gf_master_branch_name=$(grep -oP 'master\s*=\s*\K.*' ".git/config" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-  gf_develop_branch_name=$(grep -oP 'develop\s*=\s*\K.*' ".git/config" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  gf_master_branch_name=$(git config gitflow.branch.master)
+  gf_develop_branch_name=$(git config gitflow.branch.develop)
 
   # Use default names if not found
   gf_master_branch_name=${gf_master_branch_name:-$master_branch}

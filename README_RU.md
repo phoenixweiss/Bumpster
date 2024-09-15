@@ -85,6 +85,8 @@ bumpster -p
 
 ```bash
 bumpster --version
+# or
+bumpster -v
 ```
 
 ### Получение справки
@@ -93,6 +95,8 @@ bumpster --version
 
 ```bash
 bumpster --help
+# or
+bumpster -h
 ```
 
 ### Настройка имён веток
