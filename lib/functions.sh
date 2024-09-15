@@ -155,15 +155,32 @@ usage() {
     echo "Bumpster"
   fi
 
+  # Display the local version
+  local_version=$(display_version)
+
+  # Fetch the remote version
+  remote_version=$(curl -s --max-time 2 "$remote_version_file")
+
+  # Check if the remote version was successfully fetched
+  if [ -n "$remote_version" ]; then
+    if [ "$local_version" != "$remote_version" ]; then
+      version_info="$local_version (a newer version $remote_version is available)"
+    else
+      version_info="$local_version"
+    fi
+  else
+    version_info="$local_version"
+  fi
+
   cat <<EOS
-Bumpster $(display_version)
+Bumpster $version_info
 Usage:  bumpster [options]
         -h, --help               Display this message
-        -v, --version            Display the current version of Bumpster
         -M, --major              Bump major version
         -m, --minor              Bump minor version
         -p, --patch              Bump patch version
         -u, --update             Update Bumpster to the latest version
+        -v, --version            Display the current version of Bumpster
         --create-local-config    Create a local configuration file in the current directory
 EOS
   exit "${1:-0}"

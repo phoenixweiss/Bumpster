@@ -99,6 +99,20 @@ bumpster --help
 bumpster -h
 ```
 
+If a newer version is available, it will be indicated next to the version number in the help output.
+
+### Updating Bumpster
+
+To update Bumpster to the latest version, run:
+
+```bash
+bumpster --update
+# or
+bumpster -u
+```
+
+This will download and replace the existing installation with the latest version.
+
 ### Customizing Branch Names
 
 You can specify custom branch names for `master` and `develop` branches by providing a configuration file or setting them via environment variables. By default, Bumpster uses `master` and `develop`, but you can change them like this:
@@ -163,16 +177,6 @@ Before using Bumpster, ensure that `git-flow` is installed and initialized using
 ```bash
 git flow init
 ```
-
-## Updating Bumpster
-
-To update Bumpster, simply run the install command again:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/bumpster/main/install.sh)"
-```
-
-This will download and replace the existing installation with the latest version.
 
 ## Uninstalling Bumpster
 
