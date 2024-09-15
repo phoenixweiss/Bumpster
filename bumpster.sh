@@ -10,11 +10,11 @@ create_local_config=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)              usage ;;
-    -v | --version)           echo "Bumpster version: $(display_version)"
-                              exit 0 ;;
+    -v | --version)           echo "Bumpster version: $(display_version)" ; exit 0 ;;
     -M | --major )            version_type="major" ;;
     -m | --minor )            version_type="minor" ;;
     -p | --patch )            version_type="patch" ;;
+    -u | --update )           update_bumpster ; exit 0 ;;
     --create-local-config )   create_local_config="true" ;;
     *)                        printf "Unknown option: '$1'\n" >&2
                               usage 1 ;;
@@ -37,6 +37,7 @@ elif [ -f "$global_config_file" ]; then
   load_config "$global_config_file"
 else
   echo "No configuration file found."
+  echo "Running initial setup..."
   interactive_setup
 fi
 

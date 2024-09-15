@@ -22,11 +22,12 @@ mkdir -p "$bin_dir"
 echo "Downloading and installing the latest version of Bumpster..."
 curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$BUMPSTER_HOME"
 
-# Copy bumpster.sh to bin directory without the .sh extension
-cp "$BUMPSTER_HOME/bumpster.sh" "$bin_dir/bumpster"
+# Source functions.sh
+source "$BUMPSTER_HOME/lib/functions.sh"
+source "$BUMPSTER_HOME/config.sh"
 
-# Make the script executable
-chmod +x "$bin_dir/bumpster"
+# Perform post-installation steps
+post_install
 
 # Check if the bin directory is already in the PATH
 if [[ ":$PATH:" == *":$bin_dir:"* ]]; then
@@ -41,19 +42,6 @@ else
   echo ""
   echo "Then, reload your shell configuration by running:"
   echo "  source ~/.bashrc  # or the equivalent for your shell"
-fi
-
-# Check version information
-if [ -f "$BUMPSTER_HOME/VERSION" ]; then
-  local_version=$(cat "$BUMPSTER_HOME/VERSION")
-  remote_version=$(curl -s https://raw.githubusercontent.com/phoenixweiss/bumpster/main/VERSION)
-
-  if [ "$local_version" != "$remote_version" ]; then
-    echo "A new version of Bumpster is available: $remote_version (current: $local_version)."
-    echo "Please update Bumpster by running this install script again."
-  else
-    echo "You are using the latest version of Bumpster ($local_version)."
-  fi
 fi
 
 # Final message
