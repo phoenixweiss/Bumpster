@@ -119,7 +119,7 @@ log "Bumping version to $new_version"
 # Create a release branch and finalize the release with git flow
 git checkout "$gf_develop_branch_name"
 git flow release start "$new_version"
-GIT_MERGE_AUTOEDIT=no git flow release finish -m "Release $new_version" -m "Automatic release $new_version" "$new_version"
+GIT_MERGE_AUTOEDIT=no git flow release finish -m "Release $new_version" -m "Automatic release $new_version"
 
 # Push changes to the repository
 git push origin "$gf_develop_branch_name" && git push origin "$gf_master_branch_name" --tags
