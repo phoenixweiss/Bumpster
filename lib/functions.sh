@@ -117,9 +117,13 @@ post_install() {
 
   # Check if chmod was successful
   if [ $? -ne 0 ]; then
-    log "Failed to set executable permissions for bumpster.sh" >&2
+    log "Failed to set executable permissions for bumpster.sh"
+    echo ""
+    echo "Please manually set the execution permissons"
+    echo ""
+    echo "  chmod +x $BUMPSTER_HOME/bumpster.sh"
   else
-    log "Executable permissions set for bumpster.sh"
+    log "Executable permissions successfully set for bumpster.sh"
   fi
 
   # Create the bin directory if it doesn't exist
