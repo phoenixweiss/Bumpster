@@ -30,14 +30,14 @@ fi
 
 # Check if either local or global config exists, load the local config first
 if [ -f "$local_config_file" ]; then
-  echo "Using local configuration from '$local_config_file'."
+  log "Using local configuration from '$local_config_file'."
   load_config "$local_config_file"
 elif [ -f "$global_config_file" ]; then
-  echo "Using global configuration from '$global_config_file'."
+  log "Using global configuration from '$global_config_file'."
   load_config "$global_config_file"
 else
-  echo "No configuration file found."
-  echo "Running initial setup..."
+  log "No configuration file found."
+  log "Running initial setup..."
   interactive_setup
 fi
 
@@ -78,11 +78,11 @@ fi
 # Ensure VERSION file exists and read the current version
 if [ -f "VERSION" ]; then
   current_version=$(cat VERSION)
-  echo "Current version is $current_version"
+  log "Current version is $current_version"
 else
   current_version="0.0.1"
   printf "$current_version" > VERSION
-  echo "The VERSION file is created and filled with the value $current_version"
+  log "The VERSION file is created and filled with the value $current_version"
 fi
 
 # Prompt for version type if not provided
