@@ -24,7 +24,7 @@ display_version() {
 
 # Function to print an error message and exit with a status code 1
 abort() {
-  log "%s\n" "$@" >&2
+  log "$@"
   exit 1
 }
 
