@@ -12,6 +12,10 @@ BUMPSTER_HOME="${BUMPSTER_HOME:-$HOME/.bumpster}"
 global_config_file="$HOME/.bumpsterrc"
 local_config_file="$(pwd)/.bumpsterrc"
 
+# Define default log file name (can be overridden in .bumpsterrc)
+default_log_file="bumpster.log"
+log_file="$default_log_file"
+
 # Define the bin directory
 bin_dir="$BUMPSTER_HOME/bin"
 

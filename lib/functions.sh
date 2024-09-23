@@ -2,14 +2,15 @@
 
 # Function to log actions if logging is enabled, otherwise print to STDOUT
 log() {
-  local message="$(date '+%Y-%m-%d %H:%M:%S') - $1"
+  local message="$1"
 
-  # Always print to STDOUT
+  # Print message to STDOUT without date/time
   echo "$message"
 
-  # If logging is enabled, write to the log file as well
+  # If logging is enabled, write message to log file with date/time
   if [[ "$logging_enabled" == "true" ]]; then
-    echo "$message" >> bumpster.log
+    local timestamped_message="$(date '+%Y-%m-%d %H:%M:%S') - $message"
+    echo "$timestamped_message" >> "$log_file"
   fi
 }
 
@@ -34,6 +35,7 @@ create_config() {
   local master_branch="$2"
   local develop_branch="$3"
   local logging="$4"
+  local log_file="${5:-$default_log_file}"  # Use default log file if not provided
 
   # Use a clean and correctly formatted here-document
   cat > "$config_file" <<EOF
@@ -48,6 +50,9 @@ GIT_DEVELOP_BRANCH="$develop_branch"
 
 # Enable or disable logging (default: false)
 ENABLE_LOGGING="$logging"
+
+# Path to the log file (default: bumpster.log)
+LOG_FILE="$log_file"
 EOF
   log "Configuration file '$config_file' created."
 }
@@ -56,6 +61,7 @@ EOF
 interactive_setup() {
   local config_file="${1:-$global_config_file}"
   echo "Welcome to Bumpster setup!"
+
   read -p "Enter the name for the master branch [default: $default_master_branch]: " master_branch_input
   master_branch=${master_branch_input:-$default_master_branch}
 
@@ -68,8 +74,11 @@ interactive_setup() {
     logging_enabled="true"
   fi
 
+  read -p "Enter the log file path [default: $default_log_file]: " log_file_input
+  log_file=${log_file_input:-$default_log_file}
+
   # Create the config file based on user input
-  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled"
+  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file"
 }
 
 # Function to create a local config file in the current directory
@@ -92,6 +101,7 @@ load_config() {
     master_branch="${GIT_MASTER_BRANCH:-$default_master_branch}"
     develop_branch="${GIT_DEVELOP_BRANCH:-$default_develop_branch}"
     logging_enabled="${ENABLE_LOGGING:-$default_logging}"
+    log_file="${LOG_FILE:-$default_log_file}"
   fi
 }
 

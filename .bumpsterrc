@@ -9,3 +9,6 @@ GIT_DEVELOP_BRANCH="develop"
 
 # Enable or disable logging (default: false)
 ENABLE_LOGGING="true"
+
+# Path to the log file (default: bumpster.log)
+LOG_FILE="bumpster.log"
