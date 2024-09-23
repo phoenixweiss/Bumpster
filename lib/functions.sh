@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Function to log actions if logging is enabled, otherwise print to STDOUT
+log() {
+  local message="$(date '+%Y-%m-%d %H:%M:%S') - $1"
+
+  # Always print to STDOUT
+  echo "$message"
+
+  # If logging is enabled, write to the log file as well
+  if [[ "$logging_enabled" == "true" ]]; then
+    echo "$message" >> bumpster.log
+  fi
+}
+
 # Function to display the version of Bumpster
 display_version() {
   if [ -f "$local_version_file" ]; then
@@ -9,17 +22,10 @@ display_version() {
   fi
 }
 
-# Function to print an error message and exit with a status code of 1.
+# Function to print an error message and exit with a status code 1
 abort() {
-  printf "%s\n" "$@" >&2
+  log "%s\n" "$@" >&2
   exit 1
-}
-
-# Function to log actions if logging is enabled
-log() {
-  if [[ "$logging_enabled" == "true" ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> bumpster.log
-  fi
 }
 
 # Function to create a config file with the given path and values
@@ -43,7 +49,7 @@ GIT_DEVELOP_BRANCH="$develop_branch"
 # Enable or disable logging (default: false)
 ENABLE_LOGGING="$logging"
 EOF
-  echo "Configuration file '$config_file' created."
+  log "Configuration file '$config_file' created."
 }
 
 # Function to run an interactive session for configuration
@@ -72,10 +78,10 @@ create_local_config_file() {
   local local_config_file="$current_dir/.bumpsterrc"
 
   if [ -f "$local_config_file" ]; then
-    echo "Local configuration file already exists at $local_config_file."
+    log "Local configuration file already exists at $local_config_file."
   else
     interactive_setup "$local_config_file"
-    echo "Local configuration file created at $local_config_file."
+    log "Local configuration file created at $local_config_file."
   fi
 }
 
@@ -92,8 +98,19 @@ load_config() {
 # Function to perform post-installation steps
 post_install() {
 
+  # Log the post-installation process
+  log "Performing post-installation steps"
+
   # Make the main script executable
+  log "Setting executable permissions for bumpster.sh"
   chmod +x "$BUMPSTER_HOME/bumpster.sh"
+
+  # Check if chmod was successful
+  if [ $? -ne 0 ]; then
+    log "Failed to set executable permissions for bumpster.sh" >&2
+  else
+    log "Executable permissions set for bumpster.sh"
+  fi
 
   # Create the bin directory if it doesn't exist
   mkdir -p "$bin_dir"
@@ -117,7 +134,7 @@ update_bumpster() {
   if [ -f "$local_version_file" ]; then
     local_version=$(cat "$local_version_file")
   else
-    echo "Local version information not available."
+    log "Local version information not available."
     local_version="0.0.0"
   fi
 
@@ -126,12 +143,12 @@ update_bumpster() {
 
   # Compare versions
   if [ "$local_version" != "$remote_version" ]; then
-    echo "Updating Bumpster from version $local_version to $remote_version..."
+    log "Updating Bumpster from version $local_version to $remote_version..."
 
     # Create a backup
     local backup_dir="$BUMPSTER_HOME.backup.$local_version"
     cp -r "$BUMPSTER_HOME" "$backup_dir"
-    echo "Backup of the current version created at $backup_dir."
+    log "Backup of the current version created at $backup_dir."
 
     # Download and extract the latest version to a temporary directory
     local temp_dir
@@ -145,9 +162,9 @@ update_bumpster() {
     # Perform post-installation steps
     post_install
 
-    echo "Bumpster has been updated to version $remote_version."
+    log "Bumpster has been updated to version $remote_version."
   else
-    echo "You are already using the latest version of Bumpster ($local_version)."
+    log "You are already using the latest version of Bumpster ($local_version)."
   fi
 }
 
