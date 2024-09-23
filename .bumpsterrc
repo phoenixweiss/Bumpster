@@ -1,0 +1,11 @@
+# Bumpster configuration file
+# You can change the values here to configure the behavior of Bumpster
+
+# Git master branch (default: master)
+GIT_MASTER_BRANCH="main"
+
+# Git develop branch (default: develop)
+GIT_DEVELOP_BRANCH="develop"
+
+# Enable or disable logging (default: false)
+ENABLE_LOGGING="true"
