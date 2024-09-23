@@ -91,6 +91,10 @@ load_config() {
 
 # Function to perform post-installation steps
 post_install() {
+
+  # Make the main script executable
+  chmod +x "$BUMPSTER_HOME/bumpster.sh"
+
   # Create the bin directory if it doesn't exist
   mkdir -p "$bin_dir"
 
