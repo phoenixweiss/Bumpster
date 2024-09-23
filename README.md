@@ -30,7 +30,7 @@ With **Bumpster**, you can easily manage the versioning of your project, ensurin
 You can install Bumpster with a single command:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/bumpster/main/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"
 ```
 
 This will download and install Bumpster in your home directory under `~/.bumpster`.

@@ -30,7 +30,7 @@
 Установить Bumpster можно одной командой:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/bumpster/main/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"
 ```
 
 Это скачает и установит Bumpster в директорию `~/.bumpster`.

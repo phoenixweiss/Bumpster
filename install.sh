@@ -6,7 +6,7 @@
 home=$(sh -c "echo ~$(whoami)")  # Define user's home directory
 BUMPSTER_HOME="$home/.bumpster"  # Directory where Bumpster will be installed
 bin_dir="$BUMPSTER_HOME/bin"     # Directory for binary files
-version_url="https://github.com/phoenixweiss/bumpster/archive/refs/heads/main.tar.gz" # GitHub archive URL
+version_url="https://github.com/phoenixweiss/Bumpster/archive/refs/heads/main.tar.gz" # GitHub archive URL
 ### End define variables ###
 
 # Check for required tools
