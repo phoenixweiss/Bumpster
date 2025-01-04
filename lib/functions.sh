@@ -403,15 +403,19 @@ close_feature() {
   fi
 
   # Apply stashed changes back if needed
-  log "Checking for stashed changes to apply..."
   if [[ -n $(git stash list | grep "Auto-stash before closing feature branch") ]]; then
-    log "Applying stashed changes back."
-    git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'."
-    log "Stashed changes successfully applied back to the working directory."
+    log "Checking for stashed changes to apply..."
+    if [[ -z $(git diff HEAD stash@{0}) ]]; then
+      log "No changes from stash need to be applied."
+      git stash drop stash@{0} || log "Failed to drop stash. You can manually clean it up."
+    else
+      log "Applying stashed changes back."
+      git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'."
+      log "Stashed changes successfully applied back to the working directory."
+    fi
   else
     log "No stashed changes to apply."
   fi
-
 
   # Reminder about uncommitted changes
   if [[ -n $(git status --porcelain) ]]; then
