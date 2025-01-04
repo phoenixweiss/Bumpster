@@ -18,6 +18,7 @@
 - Supports automatic version bumping for **major**, **minor**, and **patch** updates.
 - Works seamlessly with Git for release management without requiring `git-flow`.
 - Configurable branch names for `master` and `develop`.
+- Feature branch creation and closing with customizable behavior.
 - Local and global configuration files for flexibility.
 - Optional logging for all operations.
 - Minimal footprint: installed in `~/.bumpster`.
@@ -117,6 +118,9 @@ Example configuration in `.bumpsterrc`:
 GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
 ENABLE_LOGGING="true"
+DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
+ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
+LOG_FILE="bumpster.log"
 ```
 
 ### Checking Repository Status
@@ -143,22 +147,32 @@ bumpster --create-local-config
 
 This guides you through an interactive setup process.
 
+### Creating and Closing Feature Branches
+
+**Create a feature branch**:
+
+```bash
+bumpster --create-feature
+# or
+bumpster -f
+```
+
+**Close the current feature branch**:
+
+```bash
+bumpster --close-feature
+# or
+bumpster -c
+```
+
+When closing a feature branch, changes are merged into the development branch, and the feature branch is optionally deleted based on configuration.
+
 ## Configuration
 
 Bumpster uses configuration files (`.bumpsterrc`) to customize its behavior. It supports two types of configuration files:
 
 - **Global Configuration**: Located in `~/.bumpsterrc`.
 - **Local Configuration**: Located in the project directory (`./.bumpsterrc`). Local configurations override global ones.
-
-### Example Configuration
-
-```bash
-# ~/.bumpsterrc or ./project/.bumpsterrc
-GIT_MASTER_BRANCH="main"
-GIT_DEVELOP_BRANCH="dev"
-ENABLE_LOGGING="true"
-LOG_FILE="bumpster.log"
-```
 
 ## Requirements
 
@@ -175,6 +189,10 @@ To completely remove Bumpster, delete the `~/.bumpster` directory:
 ```bash
 rm -rf ~/.bumpster
 ```
+
+## Author
+
+Created and maintained by **PAVEL TKACHEV (phoenixweiss)**.
 
 ## License
 
