@@ -109,21 +109,28 @@ log "Bumping version to $new_version"
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 log "Current branch is $current_branch"
 
-default_dev_branch=${develop_branch:-"develop"}
-default_master_branch=${master_branch:-"master"}
+default_dev_branch=${develop_branch:-"dev"}
+default_master_branch=${master_branch:-"main"}
 
-# Ensure the current branch is not main or dev
+log "Ensuring branch '$default_dev_branch' exists before merging."
+check_or_create_branch "$default_dev_branch"
+log "Switching to branch '$default_dev_branch' for merging."
+
+# Merge current branch into dev
 if [[ "$current_branch" != "$default_dev_branch" && "$current_branch" != "$default_master_branch" ]]; then
-  log "Merging current branch into $default_dev_branch"
-  git checkout "$default_dev_branch"
+  log "Merging current branch '$current_branch' into '$default_dev_branch'."
   git merge "$current_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
   git push origin "$default_dev_branch"
 fi
 
 # Create a release from dev to main
-log "Creating a release from $default_dev_branch to $default_master_branch"
-git checkout "$default_master_branch"
+
+log "Ensuring branch '$default_master_branch' exists before releasing."
+check_or_create_branch "$default_master_branch"
+log "Switching to branch '$default_master_branch' for releasing."
+
+log "Creating a release from '$default_dev_branch' to '$default_master_branch'."
 git merge "$default_dev_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
 git tag -a "v$new_version" -m "Release $new_version"
 git push origin "$default_master_branch" --tags
-log "Release $new_version pushed to remote repository"
+log "Release $new_version pushed to remote repository."

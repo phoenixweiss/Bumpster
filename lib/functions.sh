@@ -234,3 +234,31 @@ Usage:  bumpster [options]
 EOS
   exit "${1:-0}"
 }
+
+# Function to check if a branch exists locally or remotely, and create it if necessary
+check_or_create_branch() {
+  local branch_name="$1"
+
+  # Check if the branch exists locally
+  if ! git show-ref --verify --quiet "refs/heads/$branch_name"; then
+    log "Branch '$branch_name' does not exist locally. Creating it."
+    git checkout -b "$branch_name" || abort "Failed to create branch '$branch_name'."
+    log "Branch '$branch_name' successfully created locally."
+
+    # Check if the branch needs to be pushed remotely
+    if ! git ls-remote --exit-code origin "$branch_name" &>/dev/null; then
+      log "Branch '$branch_name' does not exist remotely. Pushing it."
+      git push -u origin "$branch_name" || log "Failed to push branch '$branch_name' to remote."
+      log "Branch '$branch_name' successfully pushed to remote."
+    fi
+  else
+    log "Branch '$branch_name' already exists locally."
+
+    # Ensure the branch is tracking the remote one
+    git checkout "$branch_name" || abort "Failed to switch to branch '$branch_name'."
+    if ! git ls-remote --exit-code origin "$branch_name" &>/dev/null; then
+      log "Branch '$branch_name' exists locally but not remotely. Pushing it."
+      git push -u origin "$branch_name"
+    fi
+  fi
+}
