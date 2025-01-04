@@ -154,5 +154,13 @@ log "Switching to branch '$default_master_branch' for releasing."
 log "Creating a release from '$default_dev_branch' to '$default_master_branch'."
 git merge "$default_dev_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
 git tag -a "v$new_version" -m "Release $new_version"
-git push origin "$default_master_branch" --tags
-log "Release $new_version pushed to remote repository."
+
+# Push the dev branch
+log "Pushing changes to development branch '$default_dev_branch'."
+git push origin "$default_dev_branch" || abort "Failed to push changes to remote branch '$default_dev_branch'."
+log "Development branch '$default_dev_branch' pushed to remote repository."
+
+# Push the main branch
+log "Pushing changes to main branch '$default_master_branch'."
+git push origin "$default_master_branch" --tags || abort "Failed to push changes to remote branch '$default_master_branch'."
+log "Main branch '$default_master_branch' pushed to remote repository."
