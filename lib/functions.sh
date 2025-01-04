@@ -262,7 +262,6 @@ Configuration options:
   DELETE_FEATURE_BRANCH_AFTER_MERGE   Automatically delete feature branches after merge (default: false)
   ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
 EOS
-EOS
   exit "${1:-0}"
 }
 
