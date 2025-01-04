@@ -108,7 +108,7 @@ bumpster -u
 
 ### Customizing Branch Names
 
-You can specify custom branch names by providing a configuration file or environment variables. Default branch names are `master` and `develop`.
+You can specify custom branch names by providing a configuration file or environment variables. Default branch names are `main` and `dev`.
 
 Example configuration in `.bumpsterrc`:
 

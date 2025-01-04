@@ -24,6 +24,10 @@ default_master_branch="main"
 default_develop_branch="dev"
 default_logging="false"
 
+# Default behavior for feature branch management
+delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
+ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
+
 # Config variables (overridden by .bumpsterrc if present)
 master_branch=""
 develop_branch=""

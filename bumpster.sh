@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export LC_ALL=C.UTF-8
+
 # Source configuration and function files
 source "$(dirname "$0")/config.sh"
 source "$(dirname "$0")/lib/functions.sh"
@@ -7,21 +9,37 @@ source "$(dirname "$0")/lib/functions.sh"
 # Process command-line options
 version_type=""
 create_local_config=""
+create_feature_branch=""
+close_feature_branch=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)              usage ;;
-    -v | --version)           echo "Bumpster version: $(display_version)" ; exit 0 ;;
-    -M | --major )            version_type="major" ;;
-    -m | --minor )            version_type="minor" ;;
-    -p | --patch )            version_type="patch" ;;
-    -u | --update )           update_bumpster ; exit 0 ;;
-    --status )                check_status ; exit 0 ;;
-    --create-local-config )   create_local_config="true" ;;
-    *)                        printf "Unknown option: '$1'\n" >&2
-                              usage 1 ;;
+    -h | --help)                    usage ;;
+    -v | --version)                 echo "Bumpster version: $(display_version)" ; exit 0 ;;
+    -M | --major )                  version_type="major" ;;
+    -m | --minor )                  version_type="minor" ;;
+    -p | --patch )                  version_type="patch" ;;
+    -u | --update )                 update_bumpster ; exit 0 ;;
+    -s | --status )                 check_status ; exit 0 ;;
+    -l | --create-local-config )    create_local_config="true" ;;
+    -f | --create-feature )         create_feature_branch="true" ;;
+    -c | --close-feature )          close_feature_branch="true" ;;
+    *)                              printf "Unknown option: '$1'\n" >&2
+    usage 1 ;;
   esac
   shift
 done
+
+# Close a feature branch if the option was passed
+if [[ "$close_feature_branch" == "true" ]]; then
+  close_feature
+  exit 0
+fi
+
+# Create a feature branch if the option was passed
+if [[ "$create_feature_branch" == "true" ]]; then
+  create_feature
+  exit 0
+fi
 
 # Create local configuration file if the option was passed
 if [[ "$create_local_config" == "true" ]]; then
@@ -111,6 +129,10 @@ log "Current branch is $current_branch"
 
 default_dev_branch=${develop_branch:-"dev"}
 default_master_branch=${master_branch:-"main"}
+
+# Export variables if needed
+export default_dev_branch
+export default_master_branch
 
 log "Ensuring branch '$default_dev_branch' exists before merging."
 check_or_create_branch "$default_dev_branch"

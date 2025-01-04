@@ -35,17 +35,19 @@ create_config() {
   local master_branch="$2"
   local develop_branch="$3"
   local logging="$4"
-  local log_file="${5:-$default_log_file}"  # Use default log file if not provided
+  local log_file="${5:-$default_log_file}"
+  local delete_feature="${6:-false}"
+  local ask_before_deleting="${7:-true}"
 
   # Use a clean and correctly formatted here-document
   cat > "$config_file" <<EOF
 # Bumpster configuration file
 # You can change the values here to configure the behavior of Bumpster
 
-# Git master branch (default: master)
+# Git master branch (default: main)
 GIT_MASTER_BRANCH="$master_branch"
 
-# Git develop branch (default: develop)
+# Git develop branch (default: dev)
 GIT_DEVELOP_BRANCH="$develop_branch"
 
 # Enable or disable logging (default: false)
@@ -53,6 +55,12 @@ ENABLE_LOGGING="$logging"
 
 # Path to the log file (default: bumpster.log)
 LOG_FILE="$log_file"
+
+# Automatically delete feature branches after merge (default: false)
+DELETE_FEATURE_BRANCH_AFTER_MERGE="$delete_feature"
+
+# Ask before deleting feature branches (default: true)
+ASK_BEFORE_DELETING_FEATURE_BRANCH="$ask_before_deleting"
 EOF
 }
 
@@ -76,8 +84,20 @@ interactive_setup() {
   read -p "Enter the log file path [default: $default_log_file]: " log_file_input
   log_file=${log_file_input:-$default_log_file}
 
+  read -p "Automatically delete feature branches after merge? (y/n) [default: no]: " delete_feature_input
+  delete_feature="false"
+  if [[ "$delete_feature_input" =~ ^(y|Y|yes|Yes)$ ]]; then
+    delete_feature="true"
+  fi
+
+  read -p "Ask before deleting feature branches? (y/n) [default: yes]: " ask_before_deleting_input
+  ask_before_deleting="true"
+  if [[ "$ask_before_deleting_input" =~ ^(n|N|no|No)$ ]]; then
+    ask_before_deleting="false"
+  fi
+
   # Create the config file based on user input
-  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file"
+  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting"
 }
 
 # Function to create a local config file in the current directory
@@ -223,14 +243,25 @@ usage() {
   cat <<EOS
 Bumpster $version_info
 Usage:  bumpster [options]
-        -h, --help               Show this help message
-        -M, --major              Bump major version
-        -m, --minor              Bump minor version
-        -p, --patch              Bump patch version
-        -u, --update             Update Bumpster to the latest version
-        -v, --version            Show current version
-        --create-local-config    Create a local configuration file
-        --status                 Show repository status
+        -h, --help                   Show this help message
+        -M, --major                  Bump major version
+        -m, --minor                  Bump minor version
+        -p, --patch                  Bump patch version
+        -u, --update                 Update Bumpster to the latest version
+        -v, --version                Show current version
+        -s, --status                 Show repository status
+        -l, --create-local-config    Create a local configuration file
+        -f, --create-feature         Create a new feature branch
+        -c, --close-feature          Close the current feature branch
+
+Configuration options:
+  GIT_MASTER_BRANCH                   Name of the master branch (default: main)
+  GIT_DEVELOP_BRANCH                  Name of the development branch (default: dev)
+  ENABLE_LOGGING                      Enable or disable logging (default: false)
+  LOG_FILE                            Path to the log file (default: bumpster.log)
+  DELETE_FEATURE_BRANCH_AFTER_MERGE   Automatically delete feature branches after merge (default: false)
+  ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
+EOS
 EOS
   exit "${1:-0}"
 }
@@ -260,5 +291,131 @@ check_or_create_branch() {
       log "Branch '$branch_name' exists locally but not remotely. Pushing it."
       git push -u origin "$branch_name"
     fi
+  fi
+}
+
+# Function to create a feature branch from the current dev branch
+create_feature() {
+  # Ensure the default_dev_branch is set
+  local dev_branch=${default_dev_branch:-"dev"}
+
+  # Ensure the current branch is dev
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+  if [[ "$current_branch" != "$dev_branch" ]]; then
+    abort "You are not on the development branch ('$dev_branch'). Switch to it before creating a feature branch."
+  fi
+
+  if [[ "$(git rev-parse --abbrev-ref HEAD)" != "$current_branch" ]]; then
+    abort "Current branch mismatch. Expected '$dev_branch'."
+  fi
+
+  # Prompt for the feature branch name
+  local feature_branch_name
+  while true; do
+    read -p "Enter the name for the new feature branch: " feature_branch_name
+    # Validate the branch name
+    if [[ -z "$feature_branch_name" ]]; then
+      echo "Branch name cannot be empty. Please try again."
+    elif [[ ! "$feature_branch_name" =~ ^[a-zA-Z0-9/_-]+$ ]]; then
+      echo "Invalid branch name. Only alphanumeric characters, '/', '_', and '-' are allowed."
+    else
+      break
+    fi
+  done
+
+  # Ensure the branch does not already exist
+  if git show-ref --verify --quiet "refs/heads/$feature_branch_name"; then
+    echo "Branch '$feature_branch_name' already exists. Please choose a different name."
+    exit 1
+  fi
+
+  # Create and switch to the feature branch
+  log "Creating feature branch '$feature_branch_name' from '$current_branch'."
+  git checkout -b "$feature_branch_name" || abort "Failed to create branch '$feature_branch_name'."
+  log "Feature branch '$feature_branch_name' created and checked out."
+}
+
+# Function to close the current feature branch
+close_feature() {
+  # Ensure the default_dev_branch is set
+  local dev_branch=${default_dev_branch:-"dev"}
+
+  # Check for uncommitted changes
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+  if [[ -n $(git status --porcelain) ]]; then
+    log "You have uncommitted changes in your working directory."
+    read -p "Do you want to stash these changes before proceeding? (y/n): " stash_response
+    if [[ "$stash_response" =~ ^(y|Y|yes|Yes)$ ]]; then
+      git stash push -m "Auto-stash before closing feature branch" || abort "Failed to stash changes."
+      log "Uncommitted changes stashed successfully."
+    else
+      log "Proceeding with uncommitted changes."
+    fi
+  fi
+
+  # Ensure the current branch is a feature branch
+  if [[ "$current_branch" == "$dev_branch" || "$current_branch" == "$default_master_branch" ]]; then
+    abort "Cannot close a feature branch from '$current_branch'. Please switch to a feature branch."
+  fi
+
+  if [[ "$(git rev-parse --abbrev-ref HEAD)" != "$current_branch" ]]; then
+    abort "Current branch mismatch. Expected '$current_branch'."
+  fi
+
+
+  # Switch to the development branch
+  log "Switching to development branch '$dev_branch'."
+  git checkout "$dev_branch" || abort "Failed to switch to branch '$dev_branch'."
+
+  # Merge the feature branch into the development branch
+  log "Merging feature branch '$current_branch' into '$dev_branch'."
+  git merge "$current_branch" --no-edit || abort "Merge failed. Please resolve conflicts manually."
+
+  git push origin "$dev_branch" || abort "Failed to push changes to remote."
+
+  # Handle branch deletion based on configuration
+  if [[ "$delete_feature_branch_after_merge" == "true" || "$ask_before_deleting_feature_branch" == "true" ]]; then
+    if [[ "$ask_before_deleting_feature_branch" == "true" ]]; then
+      read -p "Do you want to delete the feature branch '$current_branch'? (y/n): " delete_response
+      if [[ "$delete_response" =~ ^(y|Y|yes|Yes)$ ]]; then
+        if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
+          abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
+        fi
+        log "Attempting to delete feature branch '$current_branch'."
+        git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
+        git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+        log "Feature branch '$current_branch' deleted."
+      else
+        log "Feature branch '$current_branch' retained."
+      fi
+    else
+      if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
+        abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
+      fi
+      log "Attempting to delete feature branch '$current_branch'."
+      git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
+      git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+      log "Feature branch '$current_branch' deleted."
+    fi
+  else
+    log "Feature branch '$current_branch' retained."
+  fi
+
+  # Apply stashed changes back if needed
+  log "Checking for stashed changes to apply..."
+  if [[ -n $(git stash list | grep "Auto-stash before closing feature branch") ]]; then
+    log "Applying stashed changes back."
+    git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'."
+    log "Stashed changes successfully applied back to the working directory."
+  else
+    log "No stashed changes to apply."
+  fi
+
+
+  # Reminder about uncommitted changes
+  if [[ -n $(git status --porcelain) ]]; then
+    log "Reminder: You have uncommitted changes in your working directory. Please commit or stash them as needed."
   fi
 }
