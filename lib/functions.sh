@@ -54,7 +54,6 @@ ENABLE_LOGGING="$logging"
 # Path to the log file (default: bumpster.log)
 LOG_FILE="$log_file"
 EOF
-  log "Configuration file '$config_file' created."
 }
 
 # Function to run an interactive session for configuration
@@ -87,10 +86,10 @@ create_local_config_file() {
   local local_config_file="$current_dir/.bumpsterrc"
 
   if [ -f "$local_config_file" ]; then
-    log "Local configuration file already exists at $local_config_file."
+    log "Local configuration file already exists at: $local_config_file"
   else
     interactive_setup "$local_config_file"
-    log "Local configuration file created at $local_config_file."
+    log "Local configuration file successfully created at: $local_config_file"
   fi
 }
 
@@ -118,9 +117,7 @@ post_install() {
   # Check if chmod was successful
   if [ $? -ne 0 ]; then
     log "Failed to set executable permissions for bumpster.sh"
-    echo ""
-    echo "Please manually set the execution permissons"
-    echo ""
+    echo "Please manually set the execution permissions:"
     echo "  chmod +x $BUMPSTER_HOME/bumpster.sh"
   else
     log "Executable permissions successfully set for bumpster.sh"
@@ -162,11 +159,10 @@ update_bumpster() {
     # Create a backup
     local backup_dir="$BUMPSTER_HOME.backup.$local_version"
     cp -r "$BUMPSTER_HOME" "$backup_dir"
-    log "Backup of the current version created at $backup_dir."
+    log "Backup created at $backup_dir."
 
     # Download and extract the latest version to a temporary directory
-    local temp_dir
-    temp_dir=$(mktemp -d)
+    local temp_dir=$(mktemp -d)
     curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$temp_dir"
 
     # Replace the old files with the new ones
@@ -176,10 +172,27 @@ update_bumpster() {
     # Perform post-installation steps
     post_install
 
-    log "Bumpster has been updated to version $remote_version."
+    log "Bumpster updated to version $remote_version."
   else
-    log "You are already using the latest version of Bumpster ($local_version)."
+    log "You are already using the latest version ($local_version)."
   fi
+}
+
+# Function to check repository status
+check_status() {
+  local current_branch=$(git rev-parse --abbrev-ref HEAD)
+  log "Current branch: $current_branch"
+
+  if [[ "$current_branch" == "${develop_branch:-develop}" ]]; then
+    log "You are on the development branch. Ready for new features."
+  elif [[ "$current_branch" == "${master_branch:-master}" ]]; then
+    log "You are on the master branch. Only releases should be here."
+  else
+    log "You are on a feature branch. Merge your changes into the development branch when ready."
+  fi
+
+  log "Uncommitted changes: $(git status --porcelain | wc -l)"
+  log "Unpushed commits: $(git cherry -v | wc -l)"
 }
 
 # Function to show usage and version information
@@ -196,7 +209,7 @@ usage() {
   # Fetch the remote version
   remote_version=$(curl -s --max-time 2 "$remote_version_file")
 
-  # Check if the remote version was successfully fetched
+  # Check if the remote version was successfully fetched and compare
   if [ -n "$remote_version" ]; then
     if [ "$local_version" != "$remote_version" ]; then
       version_info="$local_version (a newer version $remote_version is available)"
@@ -210,13 +223,14 @@ usage() {
   cat <<EOS
 Bumpster $version_info
 Usage:  bumpster [options]
-        -h, --help               Display this message
+        -h, --help               Show this help message
         -M, --major              Bump major version
         -m, --minor              Bump minor version
         -p, --patch              Bump patch version
         -u, --update             Update Bumpster to the latest version
-        -v, --version            Display the current version of Bumpster
-        --create-local-config    Create a local configuration file in the current directory
+        -v, --version            Show current version
+        --create-local-config    Create a local configuration file
+        --status                 Show repository status
 EOS
   exit "${1:-0}"
 }

@@ -15,6 +15,7 @@ while [[ $# -gt 0 ]]; do
     -m | --minor )            version_type="minor" ;;
     -p | --patch )            version_type="patch" ;;
     -u | --update )           update_bumpster ; exit 0 ;;
+    --status )                check_status ; exit 0 ;;
     --create-local-config )   create_local_config="true" ;;
     *)                        printf "Unknown option: '$1'\n" >&2
                               usage 1 ;;
@@ -47,7 +48,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # Ensure necessary commands are available
-for cmd in git git-flow; do
+for cmd in git; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     abort "Error: $cmd is not installed. Please install it and try again."
   fi
@@ -61,18 +62,6 @@ fi
 # Ensure there are no uncommitted changes
 if [[ -n $(git status --porcelain) ]]; then
   abort "Working tree contains unstaged changes. Aborting."
-fi
-
-# Check if git flow is initialized and get branch names
-if grep -q "\[gitflow \"branch\"\]" ".git/config"; then
-  gf_master_branch_name=$(git config gitflow.branch.master)
-  gf_develop_branch_name=$(git config gitflow.branch.develop)
-
-  # Use default names if not found
-  gf_master_branch_name=${gf_master_branch_name:-$master_branch}
-  gf_develop_branch_name=${gf_develop_branch_name:-$develop_branch}
-else
-  abort "Git flow is not initialized. Please run 'git flow init' first."
 fi
 
 # Ensure VERSION file exists and read the current version
@@ -116,11 +105,25 @@ git add VERSION
 git commit -m "bump version to $new_version" -m "Automatic version bump to $new_version"
 log "Bumping version to $new_version"
 
-# Create a release branch and finalize the release with git flow
-git checkout "$gf_develop_branch_name"
-git flow release start "$new_version"
-GIT_MERGE_AUTOEDIT=no git flow release finish -m "Release $new_version" -m "Automatic release $new_version"
+# Handle branch management manually
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+log "Current branch is $current_branch"
 
-# Push changes to the repository
-git push origin "$gf_develop_branch_name" && git push origin "$gf_master_branch_name" --tags
+default_dev_branch=${develop_branch:-"develop"}
+default_master_branch=${master_branch:-"master"}
+
+# Ensure the current branch is not main or dev
+if [[ "$current_branch" != "$default_dev_branch" && "$current_branch" != "$default_master_branch" ]]; then
+  log "Merging current branch into $default_dev_branch"
+  git checkout "$default_dev_branch"
+  git merge "$current_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
+  git push origin "$default_dev_branch"
+fi
+
+# Create a release from dev to main
+log "Creating a release from $default_dev_branch to $default_master_branch"
+git checkout "$default_master_branch"
+git merge "$default_dev_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
+git tag -a "v$new_version" -m "Release $new_version"
+git push origin "$default_master_branch" --tags
 log "Release $new_version pushed to remote repository"

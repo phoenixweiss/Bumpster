@@ -5,7 +5,7 @@
 GIT_MASTER_BRANCH="main"
 
 # Git develop branch (default: develop)
-GIT_DEVELOP_BRANCH="develop"
+GIT_DEVELOP_BRANCH="dev"
 
 # Enable or disable logging (default: false)
 ENABLE_LOGGING="true"

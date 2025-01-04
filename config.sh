@@ -19,12 +19,12 @@ log_file="$default_log_file"
 # Define the bin directory
 bin_dir="$BUMPSTER_HOME/bin"
 
-# Default values
-default_master_branch="master"
-default_develop_branch="develop"
+# Default branch names
+default_master_branch="main"
+default_develop_branch="dev"
 default_logging="false"
 
-# Config variables
+# Config variables (overridden by .bumpsterrc if present)
 master_branch=""
 develop_branch=""
 logging_enabled=""

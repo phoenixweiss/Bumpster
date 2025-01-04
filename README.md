@@ -11,38 +11,37 @@
 
 [RUSSIAN VERSION](README_RU.md)
 
-**Bumpster** is a powerful utility that automates the process of semantic version bumping. The name is derived from *"bump"* and *"buster"*, reflecting its ability to quickly and easily bump the version number of your software project.
-
-With **Bumpster**, you can easily manage the versioning of your project, ensuring that your releases are always up-to-date and properly labeled. The utility supports major, minor, and patch-level bumps for bug fixes and other changes.
+**Bumpster** is a powerful utility for automating semantic version management. The name combines *"bump"* and *"buster"*, highlighting its ability to quickly and efficiently handle version bumps for your software projects.
 
 ## Key Features
 
-- Automatic version bumping for major, minor, and patch versions.
-- Easy integration with `git-flow` for release management.
-- Customizable branch names for `master` and `develop`.
-- Optional logging of all operations to a log file.
-- Minimal footprint: installs in `~/.bumpster` directory, similar to **rbenv**.
-- Clean removal: to uninstall, simply delete the `.bumpster` directory.
-- Works on Linux, macOS, and Git Bash on Windows.
+- Supports automatic version bumping for **major**, **minor**, and **patch** updates.
+- Works seamlessly with Git for release management without requiring `git-flow`.
+- Configurable branch names for `master` and `develop`.
+- Local and global configuration files for flexibility.
+- Optional logging for all operations.
+- Minimal footprint: installed in `~/.bumpster`.
+- Easy removal: delete the `.bumpster` directory to uninstall.
+- Cross-platform compatibility (Linux, macOS, and Git Bash on Windows).
 
 ## Installation
 
-You can install Bumpster with a single command:
+Install Bumpster with a single command:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"
 ```
 
-This will download and install Bumpster in your home directory under `~/.bumpster`.
+This installs Bumpster in your home directory under `~/.bumpster`.
 
-After installation, add Bumpster to your PATH by running the following command:
+After installation, add Bumpster to your PATH:
 
 ```bash
 echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-For **Git Bash on Windows**, use:
+For **Git Bash on Windows**:
 
 ```bash
 echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
@@ -50,8 +49,6 @@ source ~/.bash_profile
 ```
 
 ## Usage
-
-Once installed, Bumpster is available as a command-line tool. You can bump your project's version, customize branch names, enable logging, check the version of Bumpster itself, or get help with the following commands:
 
 ### Bumping Versions
 
@@ -91,7 +88,7 @@ bumpster -v
 
 ### Display Help
 
-To display help and see available options:
+For help and available options:
 
 ```bash
 bumpster --help
@@ -99,11 +96,9 @@ bumpster --help
 bumpster -h
 ```
 
-If a newer version is available, it will be indicated next to the version number in the help output.
-
 ### Updating Bumpster
 
-To update Bumpster to the latest version, run:
+Update Bumpster to the latest version:
 
 ```bash
 bumpster --update
@@ -111,58 +106,58 @@ bumpster --update
 bumpster -u
 ```
 
-This will download and replace the existing installation with the latest version.
-
 ### Customizing Branch Names
 
-You can specify custom branch names for `master` and `develop` branches by providing a configuration file or setting them via environment variables. By default, Bumpster uses `master` and `develop`, but you can change them like this:
+You can specify custom branch names by providing a configuration file or environment variables. Default branch names are `master` and `develop`.
+
+Example configuration in `.bumpsterrc`:
 
 ```bash
-bumpster --branch-master main --branch-develop dev
-```
-
-Alternatively, set them in the configuration file `~/.bumpsterrc` or a local config `.bumpsterrc` in the project directory:
-
-```bash
-# ~/.bumpsterrc or ./your_project/.bumpsterrc
+# ~/.bumpsterrc or ./project/.bumpsterrc
 GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
-```
-
-### Enabling Logging
-
-Bumpster supports optional logging. To enable logging of all operations to `bumpster.log`, add the following line to the configuration file:
-
-```bash
 ENABLE_LOGGING="true"
 ```
 
-Once enabled, Bumpster will create and append logs to `bumpster.log` in the current directory.
+### Checking Repository Status
 
-### Creating a local configuration file
+To check the current repository status:
 
-To create a local `.bumpsterrc` configuration file in your current project directory, run:
+```bash
+bumpster --status
+```
+
+This displays:
+
+- Current branch.
+- Number of uncommitted changes.
+- Number of unpushed commits.
+
+### Creating a Local Configuration File
+
+Generate a local `.bumpsterrc` configuration file in your project:
 
 ```bash
 bumpster --create-local-config
 ```
 
-This will guide you through an interactive setup process and generate a `.bumpsterrc` file in the current directory.
+This guides you through an interactive setup process.
 
 ## Configuration
 
-Bumpster uses a configuration file (`.bumpsterrc`) to store customizable options like branch names and logging settings. There are two types of configuration files:
+Bumpster uses configuration files (`.bumpsterrc`) to customize its behavior. It supports two types of configuration files:
 
-- **Global Configuration**: Located in `~/.bumpsterrc`, applies to all projects.
-- **Local Configuration**: Located in the root of a project (`./your_project/.bumpsterrc`), has higher priority over the global config.
+- **Global Configuration**: Located in `~/.bumpsterrc`.
+- **Local Configuration**: Located in the project directory (`./.bumpsterrc`). Local configurations override global ones.
 
-Example configuration:
+### Example Configuration
 
 ```bash
-# ~/.bumpsterrc or ./your_project/.bumpsterrc
+# ~/.bumpsterrc or ./project/.bumpsterrc
 GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
 ENABLE_LOGGING="true"
+LOG_FILE="bumpster.log"
 ```
 
 ## Requirements
@@ -170,17 +165,12 @@ ENABLE_LOGGING="true"
 - [curl](https://curl.se/)
 - [bash](https://www.gnu.org/software/bash/)
 - [git](https://git-scm.com/)
-- [git-flow](https://danielkummer.github.io/git-flow-cheatsheet/index.html)
 
-Before using Bumpster, ensure that `git-flow` is installed and initialized using:
-
-```bash
-git flow init
-```
+Before using Bumpster, ensure you have an initialized Git repository.
 
 ## Uninstalling Bumpster
 
-To completely remove Bumpster, simply delete the `~/.bumpster` directory:
+To completely remove Bumpster, delete the `~/.bumpster` directory:
 
 ```bash
 rm -rf ~/.bumpster
@@ -188,4 +178,4 @@ rm -rf ~/.bumpster
 
 ## License
 
-Bumpster is open-source and available under the MIT license.
+Bumpster is open-source software available under the MIT license.
