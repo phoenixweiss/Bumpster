@@ -384,7 +384,12 @@ close_feature() {
         fi
         log "Attempting to delete feature branch '$current_branch'."
         git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
-        git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+        if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
+          git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+          log "Remote branch '$current_branch' deleted."
+        else
+          log "Remote branch '$current_branch' does not exist. Skipping remote deletion."
+        fi
         log "Feature branch '$current_branch' deleted."
       else
         log "Feature branch '$current_branch' retained."
@@ -394,8 +399,17 @@ close_feature() {
         abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
       fi
       log "Attempting to delete feature branch '$current_branch'."
+      if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
+        abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
+      fi
+      log "Attempting to delete feature branch '$current_branch'."
       git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
-      git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+      if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
+        git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+        log "Remote branch '$current_branch' deleted."
+      else
+        log "Remote branch '$current_branch' does not exist. Skipping remote deletion."
+      fi
       log "Feature branch '$current_branch' deleted."
     fi
   else
