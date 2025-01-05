@@ -26,6 +26,17 @@ curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$BUMPSTER_HOME"
 source "$BUMPSTER_HOME/config.sh"
 source "$BUMPSTER_HOME/lib/functions.sh"
 
+# Check if 'bump' command is already in use
+if command -v bump &>/dev/null; then
+  echo "The command 'bump' is already in use. Wrapper for 'bumpster' will not be created."
+  create_bump_wrapper="false"
+else
+  create_bump_wrapper="true"
+fi
+
+# Pass the variable to post_install
+export create_bump_wrapper
+
 # Perform post-installation steps
 post_install
 

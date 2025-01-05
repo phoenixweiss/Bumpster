@@ -154,6 +154,21 @@ EOF
 
   # Make the wrapper script executable
   chmod +x "$bin_dir/bumpster"
+
+  # Optionally create the 'bump' wrapper
+  if [[ "$create_bump_wrapper" == "true" ]]; then
+    log "Creating 'bump' wrapper for 'bumpster'."
+    bump_wrapper="$bin_dir/bump"
+    cat > "$bump_wrapper" <<EOF
+#!/bin/bash
+"\$HOME/.bumpster/bumpster.sh" "\$@"
+EOF
+    chmod +x "$bump_wrapper"
+    log "'bump' wrapper created at $bump_wrapper."
+  else
+    log "'bump' command is already in use. Wrapper not created."
+  fi
+
 }
 
 # Function to update Bumpster to the latest version
@@ -188,6 +203,17 @@ update_bumpster() {
     # Replace the old files with the new ones
     rm -rf "$BUMPSTER_HOME"
     mv "$temp_dir" "$BUMPSTER_HOME"
+
+    # Check if 'bump' command is already in use
+    if command -v bump &>/dev/null; then
+      log "The command 'bump' is already in use. Wrapper for 'bumpster' will not be created during update."
+      create_bump_wrapper="false"
+    else
+      create_bump_wrapper="true"
+    fi
+
+    # Pass the variable to post_install
+    export create_bump_wrapper
 
     # Perform post-installation steps
     post_install

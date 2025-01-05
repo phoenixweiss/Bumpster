@@ -24,6 +24,7 @@
 - Minimal footprint: installed in `~/.bumpster`.
 - Easy removal: delete the `.bumpster` directory to uninstall.
 - Cross-platform compatibility (Linux, macOS, and Git Bash on Windows).
+- Optionally creates a `bump` wrapper for `bumpster`, allowing shorter commands (`bump -M`, `bump -v` etc.).
 
 ## Installation
 
@@ -47,6 +48,32 @@ For **Git Bash on Windows**:
 ```bash
 echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
+```
+
+### Optional Wrapper: `bump`
+
+During installation or update, Bumpster checks if the `bump` command is already in use. If it's not, a wrapper `bump` is created by default, allowing shorter commands.
+
+**Example Usage:**
+
+```bash
+bump --help
+bump -M
+bump -c
+```
+
+If the `bump` command is already in use, the wrapper is not created to avoid conflicts. You can manually create or remove the wrapper:
+
+**To manually create the wrapper:**
+
+```bash
+ln -s "$HOME/.bumpster/bin/bumpster" "$HOME/.bumpster/bin/bump"
+```
+
+**To remove the wrapper:**
+
+```bash
+rm "$HOME/.bumpster/bin/bump"
 ```
 
 ## Usage
