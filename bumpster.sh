@@ -87,9 +87,13 @@ if [ -f "VERSION" ]; then
   current_version=$(cat VERSION)
   log "Current version is $current_version"
 else
-  current_version="0.0.1"
+  current_version="0.0.0"
   printf "$current_version" > VERSION
   log "The VERSION file is created and filled with the value $current_version"
+  log "Initialization complete with version $current_version."
+  git add VERSION
+  git commit -m "Initialize versioning with $current_version"
+  log "Version file committed to repository."
 fi
 
 # Prompt for version type if not provided
