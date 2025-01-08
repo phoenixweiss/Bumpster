@@ -124,6 +124,28 @@ fi
 # Update the VERSION file and create a commit
 printf "$new_version" > VERSION
 git add VERSION
+
+# Synchronize version with package.json if enabled
+if [[ "${SYNC_WITH_PACKAGE_JSON}" == "true" ]]; then
+  if [ -f "package.json" ]; then
+    log "Synchronizing version with package.json."
+    # Read package.json, update the "version" field, and write it back
+    while IFS= read -r line; do
+      if [[ "$line" =~ \"version\": ]]; then
+        echo "  \"version\": \"${new_version}\"," >> package.tmp
+      else
+        echo "$line" >> package.tmp
+      fi
+    done < package.json
+    mv package.tmp package.json
+    git add package.json
+    log "Updated version in package.json to ${new_version}."
+  else
+    log "package.json not found. Skipping synchronization."
+  fi
+fi
+
+# Commit the changes
 git commit -m "bump version to $new_version" -m "Automatic version bump to $new_version"
 log "Bumping version to $new_version"
 

@@ -38,6 +38,7 @@ create_config() {
   local log_file="${5:-$default_log_file}"
   local delete_feature="${6:-false}"
   local ask_before_deleting="${7:-true}"
+  local sync_with_package="${8:-false}"
 
   # Use a clean and correctly formatted here-document
   cat > "$config_file" <<EOF
@@ -61,6 +62,9 @@ DELETE_FEATURE_BRANCH_AFTER_MERGE="$delete_feature"
 
 # Ask before deleting feature branches (default: true)
 ASK_BEFORE_DELETING_FEATURE_BRANCH="$ask_before_deleting"
+
+# Synchronize VERSION file with package.json
+SYNC_WITH_PACKAGE_JSON="${8:-false}"
 EOF
 }
 
@@ -96,8 +100,14 @@ interactive_setup() {
     ask_before_deleting="false"
   fi
 
+  read -p "Synchronize VERSION file with package.json? (y/n) [default: no]: " sync_with_package_input
+  sync_with_package="false"
+  if [[ "$sync_with_package_input" =~ ^(y|Y|yes|Yes)$ ]]; then
+    sync_with_package="true"
+  fi
+
   # Create the config file based on user input
-  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting"
+  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting" "$sync_with_package"
 }
 
 # Function to create a local config file in the current directory
@@ -287,6 +297,7 @@ Configuration options:
   LOG_FILE                            Path to the log file (default: bumpster.log)
   DELETE_FEATURE_BRANCH_AFTER_MERGE   Automatically delete feature branches after merge (default: false)
   ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
+  SYNC_WITH_PACKAGE_JSON              Synchronize VERSION file with package.json (default: false)
 EOS
   exit "${1:-0}"
 }

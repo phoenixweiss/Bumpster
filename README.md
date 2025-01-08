@@ -24,7 +24,7 @@
 - Minimal footprint: installed in `~/.bumpster`.
 - Easy removal: delete the `.bumpster` directory to uninstall.
 - Cross-platform compatibility (Linux, macOS, and Git Bash on Windows).
-- Optionally creates a `bump` wrapper for `bumpster`, allowing shorter commands (`bump -M`, `bump -v` etc.).
+- Supports optional synchronization of the `VERSION` file with `package.json`.
 
 ## Installation
 
@@ -48,32 +48,6 @@ For **Git Bash on Windows**:
 ```bash
 echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
-```
-
-### Optional Wrapper: `bump`
-
-During installation or update, Bumpster checks if the `bump` command is already in use. If it's not, a wrapper `bump` is created by default, allowing shorter commands.
-
-**Example Usage:**
-
-```bash
-bump --help
-bump -M
-bump -c
-```
-
-If the `bump` command is already in use, the wrapper is not created to avoid conflicts. You can manually create or remove the wrapper:
-
-**To manually create the wrapper:**
-
-```bash
-ln -s "$HOME/.bumpster/bin/bumpster" "$HOME/.bumpster/bin/bump"
-```
-
-**To remove the wrapper:**
-
-```bash
-rm "$HOME/.bumpster/bin/bump"
 ```
 
 ## Usage
@@ -103,6 +77,27 @@ bumpster --patch
 # or
 bumpster -p
 ```
+
+### Synchronizing with package.json
+
+Bumpster supports optional synchronization between the `VERSION` file and `package.json`. When enabled, updating the version with `bump` will automatically synchronize the version in `package.json`. If `package.json` is not found, the operation is skipped with a log message.
+
+**Example Configuration**:
+
+```bash
+SYNC_WITH_PACKAGE_JSON="true"
+```
+
+**Example Usage**:
+
+- `VERSION` updated to `1.0.0`
+- `package.json` updated with the same version:
+
+  ```json
+  {
+    "version": "1.0.0"
+  }
+  ```
 
 ### Display Version
 
@@ -144,10 +139,7 @@ Example configuration in `.bumpsterrc`:
 # ~/.bumpsterrc or ./project/.bumpsterrc
 GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
-ENABLE_LOGGING="true"
-DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
-ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
-LOG_FILE="bumpster.log"
+...
 ```
 
 ### Checking Repository Status
@@ -200,6 +192,19 @@ Bumpster uses configuration files (`.bumpsterrc`) to customize its behavior. It 
 
 - **Global Configuration**: Located in `~/.bumpsterrc`.
 - **Local Configuration**: Located in the project directory (`./.bumpsterrc`). Local configurations override global ones.
+
+### Example Configuration
+
+```bash
+# ~/.bumpsterrc or ./project/.bumpsterrc
+GIT_MASTER_BRANCH="main"
+GIT_DEVELOP_BRANCH="dev"
+ENABLE_LOGGING="true"
+LOG_FILE="bumpster.log"
+DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
+ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
+SYNC_WITH_PACKAGE_JSON="true"
+```
 
 ## Requirements
 

@@ -24,7 +24,7 @@
 - Минимальный след: устанавливается в `~/.bumpster`.
 - Легкое удаление: достаточно удалить директорию `.bumpster`.
 - Кроссплатформенная совместимость (Linux, macOS и Git Bash на Windows).
-- Опционально создаёт враппер `bump` для команды `bumpster`, позволяя использовать более короткие команды (`bump -M`, `bump -v` и т.д.).
+- Поддержка опциональной синхронизации файла `VERSION` с `package.json`.
 
 ## Установка
 
@@ -48,32 +48,6 @@ source ~/.bashrc
 ```bash
 echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
-```
-
-### Опциональный враппер: `bump`
-
-Во время установки или обновления Bumpster проверяет, используется ли команда `bump`. Если она не занята, по умолчанию создаётся враппер `bump`, позволяющий использовать сокращённые команды.
-
-**Пример использования:**
-
-```bash
-bump --help
-bump -M
-bump -c
-```
-
-Если команда `bump` уже занята, враппер не создаётся, чтобы избежать конфликтов. Вы можете вручную создать или удалить враппер:
-
-**Для создания враппера вручную:**
-
-```bash
-ln -s "$HOME/.bumpster/bin/bumpster" "$HOME/.bumpster/bin/bump"
-```
-
-**Для удаления враппера:**
-
-```bash
-rm "$HOME/.bumpster/bin/bump"
 ```
 
 ## Использование
@@ -103,6 +77,27 @@ bumpster --patch
 # или
 bumpster -p
 ```
+
+### Синхронизация с package.json
+
+Bumpster поддерживает опциональную синхронизацию между файлом `VERSION` и `package.json`. При включённой опции обновление версии через `bump` автоматически синхронизирует версию в `package.json`. Если `package.json` не найден, операция пропускается с записью в лог.
+
+**Пример настройки**:
+
+```bash
+SYNC_WITH_PACKAGE_JSON="true"
+```
+
+**Пример использования**:
+
+- `VERSION` обновлён до `1.0.0`
+- `package.json` обновлён с той же версией:
+
+  ```json
+  {
+    "version": "1.0.0"
+  }
+  ```
 
 ### Отображение версии
 
@@ -144,10 +139,7 @@ bumpster -u
 # ~/.bumpsterrc или ./project/.bumpsterrc
 GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
-ENABLE_LOGGING="true"
-DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
-ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
-LOG_FILE="bumpster.log"
+...
 ```
 
 ### Проверка состояния репозитория
@@ -200,6 +192,19 @@ Bumpster использует конфигурационные файлы (`.bum
 
 - **Глобальная конфигурация**: находится в `~/.bumpsterrc`.
 - **Локальная конфигурация**: находится в директории проекта (`./.bumpsterrc`). Локальные настройки имеют приоритет над глобальными.
+
+### Пример конфигурации
+
+```bash
+# ~/.bumpsterrc или ./project/.bumpsterrc
+GIT_MASTER_BRANCH="main"
+GIT_DEVELOP_BRANCH="dev"
+ENABLE_LOGGING="true"
+LOG_FILE="bumpster.log"
+DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
+ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
+SYNC_WITH_PACKAGE_JSON="true"
+```
 
 ## Требования
 
