@@ -1,10 +1,10 @@
 # Bumpster configuration file
 # You can change the values here to configure the behavior of Bumpster
 
-# Git master branch (default: master)
+# Git master branch (default: main)
 GIT_MASTER_BRANCH="main"
 
-# Git develop branch (default: develop)
+# Git develop branch (default: dev)
 GIT_DEVELOP_BRANCH="dev"
 
 # Enable or disable logging (default: false)
@@ -12,3 +12,15 @@ ENABLE_LOGGING="true"
 
 # Path to the log file (default: bumpster.log)
 LOG_FILE="bumpster.log"
+
+# Automatically delete feature branches after merge (default: false)
+DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
+
+# Ask before deleting feature branches (default: true)
+ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
+
+# Synchronize VERSION file with package.json
+SYNC_WITH_PACKAGE_JSON="false"
+
+# Branch to switch to after bumping version
+AFTER_BUMP_BRANCH="dev"

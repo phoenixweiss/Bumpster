@@ -142,6 +142,16 @@ GIT_DEVELOP_BRANCH="dev"
 ...
 ```
 
+### AFTER_BUMP_BRANCH option
+
+This option allows you to specify the branch to switch to after a version bump. By default, it switches to the main branch. If the specified branch does not exist, it falls back to the default branch.
+
+**Example**:
+
+```bash
+AFTER_BUMP_BRANCH="dev"
+```
+
 ### Checking Repository Status
 
 To check the current repository status:
@@ -208,6 +218,7 @@ LOG_FILE="bumpster.log"
 DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
 ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
 SYNC_WITH_PACKAGE_JSON="true"
+AFTER_BUMP_BRANCH="dev"
 ```
 
 ## Requirements

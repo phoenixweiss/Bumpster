@@ -142,6 +142,16 @@ GIT_DEVELOP_BRANCH="dev"
 ...
 ```
 
+### Опция AFTER_BUMP_BRANCH
+
+Эта опция позволяет указать ветку, на которую следует переключиться после повышения версии. По умолчанию переключается на основную ветку. Если указанная ветка не существует, возвращается к ветке по умолчанию.
+
+**Пример**:
+
+```bash
+AFTER_BUMP_BRANCH="dev"
+```
+
 ### Проверка состояния репозитория
 
 Чтобы проверить текущее состояние репозитория:
@@ -208,6 +218,7 @@ LOG_FILE="bumpster.log"
 DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
 ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
 SYNC_WITH_PACKAGE_JSON="true"
+AFTER_BUMP_BRANCH="dev"
 ```
 
 ## Требования

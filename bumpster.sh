@@ -153,6 +153,19 @@ log "Bumping version to $new_version"
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 log "Current branch is $current_branch"
 
+# Determine the branch to switch to after bump
+after_bump_branch=${AFTER_BUMP_BRANCH:-$default_master_branch}
+
+# Ensure the branch exists
+if ! git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
+  log "Branch '$after_bump_branch' does not exist. Falling back to default branch '$default_master_branch'."
+  after_bump_branch="$default_master_branch"
+fi
+
+# Switch to the after bump branch
+log "Switching to branch '$after_bump_branch'."
+git checkout "$after_bump_branch" || abort "Failed to switch to branch '$after_bump_branch'."
+
 default_dev_branch=${develop_branch:-"dev"}
 default_master_branch=${master_branch:-"main"}
 

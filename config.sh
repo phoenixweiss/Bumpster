@@ -28,6 +28,9 @@ default_logging="false"
 delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
 ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
 
+# Default branch to switch to after bump
+AFTER_BUMP_BRANCH=${AFTER_BUMP_BRANCH:-"$default_master_branch"}
+
 # Config variables (overridden by .bumpsterrc if present)
 master_branch=""
 develop_branch=""

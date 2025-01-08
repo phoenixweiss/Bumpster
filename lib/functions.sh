@@ -39,6 +39,7 @@ create_config() {
   local delete_feature="${6:-false}"
   local ask_before_deleting="${7:-true}"
   local sync_with_package="${8:-false}"
+  local after_bump_branch="${9:-$master_branch}"
 
   # Use a clean and correctly formatted here-document
   cat > "$config_file" <<EOF
@@ -65,6 +66,9 @@ ASK_BEFORE_DELETING_FEATURE_BRANCH="$ask_before_deleting"
 
 # Synchronize VERSION file with package.json
 SYNC_WITH_PACKAGE_JSON="${8:-false}"
+
+# Branch to switch to after bumping version
+AFTER_BUMP_BRANCH="$after_bump_branch"
 EOF
 }
 
@@ -106,8 +110,11 @@ interactive_setup() {
     sync_with_package="true"
   fi
 
+  read -p "Enter the branch to switch to after version bump [default: $default_master_branch]: " after_bump_branch_input
+  after_bump_branch=${after_bump_branch_input:-$default_master_branch}
+
   # Create the config file based on user input
-  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting" "$sync_with_package"
+  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting" "$sync_with_package" "$after_bump_branch"
 }
 
 # Function to create a local config file in the current directory
@@ -134,6 +141,7 @@ load_config() {
     delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
     ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
     sync_with_package_json="${SYNC_WITH_PACKAGE_JSON:-false}"
+    after_bump_branch="${AFTER_BUMP_BRANCH:-$default_master_branch}"
   fi
 }
 
@@ -301,6 +309,7 @@ Configuration options:
   DELETE_FEATURE_BRANCH_AFTER_MERGE   Automatically delete feature branches after merge (default: false)
   ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
   SYNC_WITH_PACKAGE_JSON              Synchronize VERSION file with package.json (default: false)
+  AFTER_BUMP_BRANCH                   Branch to switch to after bumping version (default: main)
 EOS
   exit "${1:-0}"
 }
