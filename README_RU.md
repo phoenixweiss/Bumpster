@@ -59,7 +59,7 @@ source ~/.bash_profile
 ```bash
 bumpster --major
 # или
-bumpster -M
+bump -M
 ```
 
 **Обновление minor-версии**:
@@ -67,7 +67,7 @@ bumpster -M
 ```bash
 bumpster --minor
 # или
-bumpster -m
+bump -m
 ```
 
 **Обновление patch-версии**:
@@ -75,7 +75,7 @@ bumpster -m
 ```bash
 bumpster --patch
 # или
-bumpster -p
+bump -p
 ```
 
 ### Синхронизация с package.json
@@ -106,7 +106,7 @@ SYNC_WITH_PACKAGE_JSON="true"
 ```bash
 bumpster --version
 # или
-bumpster -v
+bump -v
 ```
 
 ### Отображение справки
@@ -116,7 +116,7 @@ bumpster -v
 ```bash
 bumpster --help
 # или
-bumpster -h
+bump -h
 ```
 
 ### Обновление Bumpster
@@ -126,7 +126,7 @@ bumpster -h
 ```bash
 bumpster --update
 # или
-bumpster -u
+bump -u
 ```
 
 ### Настройка имен веток
@@ -148,6 +148,8 @@ GIT_DEVELOP_BRANCH="dev"
 
 ```bash
 bumpster --status
+# или
+bump -s
 ```
 
 Вывод включает:
@@ -162,6 +164,8 @@ bumpster --status
 
 ```bash
 bumpster --create-local-config
+# или
+bump -l
 ```
 
 Утилита проведет вас через интерактивный процесс настройки.
@@ -173,7 +177,7 @@ bumpster --create-local-config
 ```bash
 bumpster --create-feature
 # или
-bumpster -f
+bump -f
 ```
 
 **Закрыть текущую feature-ветку**:
@@ -181,7 +185,7 @@ bumpster -f
 ```bash
 bumpster --close-feature
 # или
-bumpster -c
+bump -c
 ```
 
 При закрытии feature-ветки изменения сливаются в ветку разработки, а feature-ветка может быть удалена в зависимости от настроек.

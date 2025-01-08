@@ -59,7 +59,7 @@ source ~/.bash_profile
 ```bash
 bumpster --major
 # or
-bumpster -M
+bump -M
 ```
 
 **Bump minor version**:
@@ -67,7 +67,7 @@ bumpster -M
 ```bash
 bumpster --minor
 # or
-bumpster -m
+bump -m
 ```
 
 **Bump patch version**:
@@ -75,7 +75,7 @@ bumpster -m
 ```bash
 bumpster --patch
 # or
-bumpster -p
+bump -p
 ```
 
 ### Synchronizing with package.json
@@ -106,7 +106,7 @@ To display the current version of Bumpster:
 ```bash
 bumpster --version
 # or
-bumpster -v
+bump -v
 ```
 
 ### Display Help
@@ -116,7 +116,7 @@ For help and available options:
 ```bash
 bumpster --help
 # or
-bumpster -h
+bump -h
 ```
 
 ### Updating Bumpster
@@ -126,7 +126,7 @@ Update Bumpster to the latest version:
 ```bash
 bumpster --update
 # or
-bumpster -u
+bump -u
 ```
 
 ### Customizing Branch Names
@@ -148,6 +148,8 @@ To check the current repository status:
 
 ```bash
 bumpster --status
+# or
+bump -s
 ```
 
 This displays:
@@ -162,6 +164,8 @@ Generate a local `.bumpsterrc` configuration file in your project:
 
 ```bash
 bumpster --create-local-config
+# or
+bump -l
 ```
 
 This guides you through an interactive setup process.
@@ -173,7 +177,7 @@ This guides you through an interactive setup process.
 ```bash
 bumpster --create-feature
 # or
-bumpster -f
+bump -f
 ```
 
 **Close the current feature branch**:
@@ -181,7 +185,7 @@ bumpster -f
 ```bash
 bumpster --close-feature
 # or
-bumpster -c
+bump -c
 ```
 
 When closing a feature branch, changes are merged into the development branch, and the feature branch is optionally deleted based on configuration.
