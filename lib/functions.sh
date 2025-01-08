@@ -131,6 +131,9 @@ load_config() {
     develop_branch="${GIT_DEVELOP_BRANCH:-$default_develop_branch}"
     logging_enabled="${ENABLE_LOGGING:-$default_logging}"
     log_file="${LOG_FILE:-$default_log_file}"
+    delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
+    ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
+    sync_with_package_json="${SYNC_WITH_PACKAGE_JSON:-false}"
   fi
 }
 

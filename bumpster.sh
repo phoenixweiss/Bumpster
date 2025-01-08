@@ -126,10 +126,10 @@ printf "$new_version" > VERSION
 git add VERSION
 
 # Synchronize version with package.json if enabled
-if [[ "${SYNC_WITH_PACKAGE_JSON}" == "true" ]]; then
+if [[ "${sync_with_package_json}" == "true" ]]; then
   if [ -f "package.json" ]; then
     log "Synchronizing version with package.json."
-    # Read package.json, update the "version" field, and write it back
+    # Update version in package.json
     while IFS= read -r line; do
       if [[ "$line" =~ \"version\": ]]; then
         echo "  \"version\": \"${new_version}\"," >> package.tmp
