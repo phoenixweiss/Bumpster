@@ -203,3 +203,14 @@ log "Development branch '$default_dev_branch' pushed to remote repository."
 log "Pushing changes to main branch '$default_master_branch'."
 git push origin "$default_master_branch" --tags || abort "Failed to push changes to remote branch '$default_master_branch'."
 log "Main branch '$default_master_branch' pushed to remote repository."
+
+# Switch to after bump branch if specified
+if [[ -n "$after_bump_branch" ]]; then
+  log "Switching to branch '$after_bump_branch' after bumping version."
+  if git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
+    git checkout "$after_bump_branch" || abort "Failed to switch to branch '$after_bump_branch'."
+  else
+    log "Branch '$after_bump_branch' does not exist. Falling back to '$default_master_branch'."
+    git checkout "$default_master_branch" || abort "Failed to switch to branch '$default_master_branch'."
+  fi
+fi
