@@ -1,3 +1,4 @@
 # dotenv environment variables file
 .env
 bumpster.log
+*.tmp.md
