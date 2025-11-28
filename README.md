@@ -52,6 +52,13 @@ source ~/.bash_profile
 
 ## Usage
 
+### Pre-flight Checks
+
+Before running any command:
+
+- Ensure you are inside an initialized Git repository (`git rev-parse --git-dir` should print the `.git` path and exit without errors).
+- Make sure your working tree is clean. `bumpster.sh` refuses to run if there are unstaged or uncommitted changes to prevent accidental data loss.
+
 ### Bumping Versions
 
 **Bump major version**:
@@ -144,7 +151,7 @@ GIT_DEVELOP_BRANCH="dev"
 
 ### AFTER_BUMP_BRANCH option
 
-This option allows you to specify the branch to switch to after a version bump. By default, it switches to the main branch. If the specified branch does not exist, it falls back to the default branch.
+This option allows you to specify the branch to switch to after a version bump. By default, it switches back to the development branch (so you can resume work in `dev` right after tagging a release). If the specified branch does not exist, it falls back to the configured development branch.
 
 **Example**:
 
@@ -189,6 +196,8 @@ bumpster --create-feature
 # or
 bump -f
 ```
+
+This command must be executed from your configured development branch (default `dev`). Bumpster validates the current branch and aborts otherwise, ensuring feature branches always fork from the correct base. Branch names may contain alphanumeric characters plus `/`, `_`, and `-`.
 
 **Close the current feature branch**:
 

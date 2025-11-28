@@ -8,7 +8,7 @@ GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
 
 # Enable or disable logging (default: false)
-ENABLE_LOGGING="true"
+ENABLE_LOGGING="false"
 
 # Path to the log file (default: bumpster.log)
 LOG_FILE="bumpster.log"
@@ -22,5 +22,5 @@ ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
 # Synchronize VERSION file with package.json
 SYNC_WITH_PACKAGE_JSON="false"
 
-# Branch to switch to after bumping version
+# Branch to switch to after bumping version (default: dev)
 AFTER_BUMP_BRANCH="dev"

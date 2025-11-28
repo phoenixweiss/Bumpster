@@ -39,7 +39,7 @@ create_config() {
   local delete_feature="${6:-false}"
   local ask_before_deleting="${7:-true}"
   local sync_with_package="${8:-false}"
-  local after_bump_branch="${9:-$master_branch}"
+  local after_bump_branch="${9:-$develop_branch}"
 
   # Use a clean and correctly formatted here-document
   cat > "$config_file" <<EOF
@@ -65,7 +65,7 @@ DELETE_FEATURE_BRANCH_AFTER_MERGE="$delete_feature"
 ASK_BEFORE_DELETING_FEATURE_BRANCH="$ask_before_deleting"
 
 # Synchronize VERSION file with package.json
-SYNC_WITH_PACKAGE_JSON="${8:-false}"
+SYNC_WITH_PACKAGE_JSON="$sync_with_package"
 
 # Branch to switch to after bumping version
 AFTER_BUMP_BRANCH="$after_bump_branch"
@@ -110,8 +110,8 @@ interactive_setup() {
     sync_with_package="true"
   fi
 
-  read -p "Enter the branch to switch to after version bump [default: $default_master_branch]: " after_bump_branch_input
-  after_bump_branch=${after_bump_branch_input:-$default_master_branch}
+  read -p "Enter the branch to switch to after version bump [default: $default_develop_branch]: " after_bump_branch_input
+  after_bump_branch=${after_bump_branch_input:-$default_develop_branch}
 
   # Create the config file based on user input
   create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting" "$sync_with_package" "$after_bump_branch"
@@ -141,7 +141,7 @@ load_config() {
     delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
     ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
     sync_with_package_json="${SYNC_WITH_PACKAGE_JSON:-false}"
-    after_bump_branch="${AFTER_BUMP_BRANCH:-$default_master_branch}"
+    after_bump_branch="${AFTER_BUMP_BRANCH:-$default_develop_branch}"
   fi
 }
 
@@ -250,9 +250,12 @@ check_status() {
   local current_branch=$(git rev-parse --abbrev-ref HEAD)
   log "Current branch: $current_branch"
 
-  if [[ "$current_branch" == "${develop_branch:-develop}" ]]; then
+  local effective_develop_branch="${develop_branch:-$default_develop_branch}"
+  local effective_master_branch="${master_branch:-$default_master_branch}"
+
+  if [[ "$current_branch" == "$effective_develop_branch" ]]; then
     log "You are on the development branch. Ready for new features."
-  elif [[ "$current_branch" == "${master_branch:-master}" ]]; then
+  elif [[ "$current_branch" == "$effective_master_branch" ]]; then
     log "You are on the master branch. Only releases should be here."
   else
     log "You are on a feature branch. Merge your changes into the development branch when ready."
@@ -309,7 +312,7 @@ Configuration options:
   DELETE_FEATURE_BRANCH_AFTER_MERGE   Automatically delete feature branches after merge (default: false)
   ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
   SYNC_WITH_PACKAGE_JSON              Synchronize VERSION file with package.json (default: false)
-  AFTER_BUMP_BRANCH                   Branch to switch to after bumping version (default: main)
+  AFTER_BUMP_BRANCH                   Branch to switch to after bumping version (default: dev)
 EOS
   exit "${1:-0}"
 }
@@ -344,8 +347,8 @@ check_or_create_branch() {
 
 # Function to create a feature branch from the current dev branch
 create_feature() {
-  # Ensure the default_dev_branch is set
-  local dev_branch=${default_dev_branch:-"dev"}
+  # Use the configured develop branch or fall back to default_develop_branch
+  local dev_branch="${develop_branch:-$default_develop_branch}"
 
   # Ensure the current branch is dev
   current_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -385,8 +388,9 @@ create_feature() {
 
 # Function to close the current feature branch
 close_feature() {
-  # Ensure the default_dev_branch is set
-  local dev_branch=${default_dev_branch:-"dev"}
+  # Use the configured develop and master branches, falling back to defaults
+  local dev_branch="${develop_branch:-$default_develop_branch}"
+  local master_branch_name="${master_branch:-$default_master_branch}"
 
   # Check for uncommitted changes
   local current_branch
@@ -404,7 +408,7 @@ close_feature() {
   fi
 
   # Ensure the current branch is a feature branch
-  if [[ "$current_branch" == "$dev_branch" || "$current_branch" == "$default_master_branch" ]]; then
+  if [[ "$current_branch" == "$dev_branch" || "$current_branch" == "$master_branch_name" ]]; then
     abort "Cannot close a feature branch from '$current_branch'. Please switch to a feature branch."
   fi
 
@@ -444,10 +448,6 @@ close_feature() {
         log "Feature branch '$current_branch' retained."
       fi
     else
-      if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
-        abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
-      fi
-      log "Attempting to delete feature branch '$current_branch'."
       if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
         abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
       fi

@@ -29,6 +29,15 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# Preload configuration if branch-management commands were requested
+if [[ "$close_feature_branch" == "true" || "$create_feature_branch" == "true" ]]; then
+  if [ -f "$local_config_file" ]; then
+    load_config "$local_config_file"
+  elif [ -f "$global_config_file" ]; then
+    load_config "$global_config_file"
+  fi
+fi
+
 # Close a feature branch if the option was passed
 if [[ "$close_feature_branch" == "true" ]]; then
   close_feature
@@ -154,12 +163,12 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 log "Current branch is $current_branch"
 
 # Determine the branch to switch to after bump
-after_bump_branch=${AFTER_BUMP_BRANCH:-$default_master_branch}
+after_bump_branch=${AFTER_BUMP_BRANCH:-$default_develop_branch}
 
 # Ensure the branch exists
 if ! git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
-  log "Branch '$after_bump_branch' does not exist. Falling back to default branch '$default_master_branch'."
-  after_bump_branch="$default_master_branch"
+  log "Branch '$after_bump_branch' does not exist. Falling back to development branch '$default_develop_branch'."
+  after_bump_branch="$default_develop_branch"
 fi
 
 # Switch to the after bump branch
