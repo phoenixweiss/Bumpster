@@ -1,16 +1,43 @@
 #!/bin/bash
 
-# Function to log actions if logging is enabled, otherwise print to STDOUT
+# Function to log actions with simple severity levels
 log() {
   local message="$1"
+  local level="${2:-INFO}"
+  local formatted="[$level] $message"
 
-  # Print message to STDOUT without date/time
-  echo "$message"
+  if [[ "$level" == "ERROR" ]]; then
+    >&2 echo "$formatted"
+  else
+    echo "$formatted"
+  fi
 
-  # If logging is enabled, write message to log file with date/time
   if [[ "$logging_enabled" == "true" ]]; then
-    local timestamped_message="$(date '+%Y-%m-%d %H:%M:%S') - $message"
+    local timestamped_message="$(date '+%Y-%m-%d %H:%M:%S') $formatted"
     echo "$timestamped_message" >> "$log_file"
+  fi
+}
+
+# Function to run custom hooks (project-level takes priority over global)
+run_hook() {
+  local hook_name="$1"
+  local project_hook_path="$(pwd)/.bumpster/hooks/$hook_name"
+  local global_hook_path="$BUMPSTER_HOME/hooks/$hook_name"
+  local hook_to_run=""
+
+  if [ -x "$project_hook_path" ]; then
+    hook_to_run="$project_hook_path"
+  elif [ -x "$global_hook_path" ]; then
+    hook_to_run="$global_hook_path"
+  fi
+
+  if [ -z "$hook_to_run" ]; then
+    return 0
+  fi
+
+  log "Running hook '$hook_name' from '$hook_to_run'."
+  if ! "$hook_to_run"; then
+    abort "Hook '$hook_name' failed."
   fi
 }
 
@@ -25,7 +52,7 @@ display_version() {
 
 # Function to print an error message and exit with a status code 1
 abort() {
-  log "$@"
+  log "$*" "ERROR"
   exit 1
 }
 
@@ -40,6 +67,7 @@ create_config() {
   local ask_before_deleting="${7:-true}"
   local sync_with_package="${8:-false}"
   local after_bump_branch="${9:-$develop_branch}"
+  local before_bump_branch="${10:-$develop_branch}"
 
   # Use a clean and correctly formatted here-document
   cat > "$config_file" <<EOF
@@ -69,6 +97,9 @@ SYNC_WITH_PACKAGE_JSON="$sync_with_package"
 
 # Branch to switch to after bumping version
 AFTER_BUMP_BRANCH="$after_bump_branch"
+
+# Branch that must be checked out before bumping version
+BEFORE_BUMP_BRANCH="$before_bump_branch"
 EOF
 }
 
@@ -113,8 +144,11 @@ interactive_setup() {
   read -p "Enter the branch to switch to after version bump [default: $default_develop_branch]: " after_bump_branch_input
   after_bump_branch=${after_bump_branch_input:-$default_develop_branch}
 
+  read -p "Enter the branch that must be active before bumping [default: $default_develop_branch]: " before_bump_branch_input
+  before_bump_branch=${before_bump_branch_input:-$default_develop_branch}
+
   # Create the config file based on user input
-  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting" "$sync_with_package" "$after_bump_branch"
+  create_config "$config_file" "$master_branch" "$develop_branch" "$logging_enabled" "$log_file" "$delete_feature" "$ask_before_deleting" "$sync_with_package" "$after_bump_branch" "$before_bump_branch"
 }
 
 # Function to create a local config file in the current directory
@@ -142,6 +176,7 @@ load_config() {
     ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
     sync_with_package_json="${SYNC_WITH_PACKAGE_JSON:-false}"
     after_bump_branch="${AFTER_BUMP_BRANCH:-$default_develop_branch}"
+    before_bump_branch="${BEFORE_BUMP_BRANCH:-$default_before_bump_branch}"
   fi
 }
 
@@ -157,7 +192,7 @@ post_install() {
 
   # Check if chmod was successful
   if [ $? -ne 0 ]; then
-    log "Failed to set executable permissions for bumpster.sh"
+    log "Failed to set executable permissions for bumpster.sh" "WARN"
     echo "Please manually set the execution permissions:"
     echo "  chmod +x $BUMPSTER_HOME/bumpster.sh"
   else
@@ -206,7 +241,14 @@ update_bumpster() {
   fi
 
   # Fetch the remote version
-  remote_version=$(curl -s "$remote_version_file")
+  if ! remote_version=$(curl -s "$remote_version_file"); then
+    log "Failed to fetch remote version information from $remote_version_file." "WARN"
+    return 1
+  fi
+  if [[ -z "$remote_version" ]]; then
+    log "Remote version information is empty. Skipping update." "WARN"
+    return 1
+  fi
 
   # Compare versions
   if [ "$local_version" != "$remote_version" ]; then
@@ -214,12 +256,16 @@ update_bumpster() {
 
     # Create a backup
     local backup_dir="$BUMPSTER_HOME.backup.$local_version"
-    cp -r "$BUMPSTER_HOME" "$backup_dir"
+    if ! cp -r "$BUMPSTER_HOME" "$backup_dir"; then
+      abort "Failed to create backup in $backup_dir."
+    fi
     log "Backup created at $backup_dir."
 
     # Download and extract the latest version to a temporary directory
     local temp_dir=$(mktemp -d)
-    curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$temp_dir"
+    if ! curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$temp_dir"; then
+      abort "Failed to download and extract the latest Bumpster archive."
+    fi
 
     # Replace the old files with the new ones
     rm -rf "$BUMPSTER_HOME"
@@ -313,6 +359,7 @@ Configuration options:
   ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
   SYNC_WITH_PACKAGE_JSON              Synchronize VERSION file with package.json (default: false)
   AFTER_BUMP_BRANCH                   Branch to switch to after bumping version (default: dev)
+  BEFORE_BUMP_BRANCH                  Branch that must be checked out before bumping version (default: dev)
 EOS
   exit "${1:-0}"
 }
@@ -330,7 +377,7 @@ check_or_create_branch() {
     # Check if the branch needs to be pushed remotely
     if ! git ls-remote --exit-code origin "$branch_name" &>/dev/null; then
       log "Branch '$branch_name' does not exist remotely. Pushing it."
-      git push -u origin "$branch_name" || log "Failed to push branch '$branch_name' to remote."
+      git push -u origin "$branch_name" || log "Failed to push branch '$branch_name' to remote." "WARN"
       log "Branch '$branch_name' successfully pushed to remote."
     fi
   else
@@ -376,8 +423,7 @@ create_feature() {
 
   # Ensure the branch does not already exist
   if git show-ref --verify --quiet "refs/heads/$feature_branch_name"; then
-    echo "Branch '$feature_branch_name' already exists. Please choose a different name."
-    exit 1
+    abort "Branch '$feature_branch_name' already exists. Please choose a different name."
   fi
 
   # Create and switch to the feature branch
@@ -438,7 +484,7 @@ close_feature() {
         log "Attempting to delete feature branch '$current_branch'."
         git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
         if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
-          git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+          git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'." "WARN"
           log "Remote branch '$current_branch' deleted."
         else
           log "Remote branch '$current_branch' does not exist. Skipping remote deletion."
@@ -454,7 +500,7 @@ close_feature() {
       log "Attempting to delete feature branch '$current_branch'."
       git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
       if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
-        git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'."
+        git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'." "WARN"
         log "Remote branch '$current_branch' deleted."
       else
         log "Remote branch '$current_branch' does not exist. Skipping remote deletion."
@@ -470,10 +516,10 @@ close_feature() {
     log "Checking for stashed changes to apply..."
     if [[ -z $(git diff HEAD stash@{0}) ]]; then
       log "No changes from stash need to be applied."
-      git stash drop stash@{0} || log "Failed to drop stash. You can manually clean it up."
+      git stash drop stash@{0} || log "Failed to drop stash. You can manually clean it up." "WARN"
     else
       log "Applying stashed changes back."
-      git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'."
+      git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'." "WARN"
       log "Stashed changes successfully applied back to the working directory."
     fi
   else

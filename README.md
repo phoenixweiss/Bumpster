@@ -21,6 +21,7 @@
 - Feature branch creation and closing with customizable behavior.
 - Local and global configuration files for flexibility.
 - Optional logging for all operations.
+- Custom hooks (pre-bump/post-bump) for project-specific workflows.
 - Minimal footprint: installed in `~/.bumpster`.
 - Easy removal: delete the `.bumpster` directory to uninstall.
 - Cross-platform compatibility (Linux, macOS, and Git Bash on Windows).
@@ -58,6 +59,7 @@ Before running any command:
 
 - Ensure you are inside an initialized Git repository (`git rev-parse --git-dir` should print the `.git` path and exit without errors).
 - Make sure your working tree is clean. `bumpster.sh` refuses to run if there are unstaged or uncommitted changes to prevent accidental data loss.
+- Double-check that the active branch matches your configured `BEFORE_BUMP_BRANCH` (defaults to `dev`); Bumpster aborts otherwise to keep releases consistent.
 
 ### Bumping Versions
 
@@ -146,7 +148,13 @@ Example configuration in `.bumpsterrc`:
 # ~/.bumpsterrc or ./project/.bumpsterrc
 GIT_MASTER_BRANCH="main"
 GIT_DEVELOP_BRANCH="dev"
-...
+ENABLE_LOGGING="true"
+LOG_FILE="bumpster.log"
+DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
+ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
+SYNC_WITH_PACKAGE_JSON="true"
+AFTER_BUMP_BRANCH="dev"
+BEFORE_BUMP_BRANCH="dev"
 ```
 
 ### AFTER_BUMP_BRANCH option
@@ -158,6 +166,10 @@ This option allows you to specify the branch to switch to after a version bump. 
 ```bash
 AFTER_BUMP_BRANCH="dev"
 ```
+
+### BEFORE_BUMP_BRANCH option
+
+This option defines the branch you must be on before running `bumpster`. By default it expects the development branch. Bumpster validates that the configured branch exists locally and that you are currently on it, aborting otherwise so every release starts from the correct branch.
 
 ### Checking Repository Status
 
@@ -208,6 +220,33 @@ bump -c
 ```
 
 When closing a feature branch, changes are merged into the development branch, and the feature branch is optionally deleted based on configuration.
+
+### Custom Hooks
+
+You can extend Bumpster by providing executable scripts in `.bumpster/hooks/` inside your project (or `~/.bumpster/hooks/` for global hooks). The following hook names are supported:
+
+- `pre-bump` - runs after the new version is calculated but before files are updated/committed.
+- `post-bump` - runs after the release process completes and branches are synchronized.
+
+Hooks receive the environment variables `BUMPSTER_PREV_VERSION` and `BUMPSTER_NEW_VERSION` so you can inspect both versions. If a hook exits with a non-zero status, the bump process is aborted.
+
+**Example use-cases**
+
+- `pre-bump`: lint or validate files before committing, for example:
+
+  ```bash
+  #! /bin/bash
+  npm run test || exit 1
+  ```
+
+  Returning a non-zero exit code prevents the bump if tests fail.
+
+- `post-bump`: notify your team or trigger CI:
+
+  ```bash
+  #! /bin/bash
+  echo "New release $BUMPSTER_NEW_VERSION is ready" | mail -s "Bumpster" devs@example.com
+  ```
 
 ## Configuration
 

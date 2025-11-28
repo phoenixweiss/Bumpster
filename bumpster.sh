@@ -91,6 +91,19 @@ if [[ -n $(git status --porcelain) ]]; then
   abort "Working tree contains unstaged changes. Aborting."
 fi
 
+# Ensure the configured before-bump branch exists and is checked out
+required_before_branch="${before_bump_branch:-$default_before_bump_branch}"
+if [[ -z "$required_before_branch" ]]; then
+  required_before_branch="$default_before_bump_branch"
+fi
+if ! git show-ref --verify --quiet "refs/heads/$required_before_branch"; then
+  abort "Configured BEFORE_BUMP_BRANCH '$required_before_branch' does not exist. Please create it or update your configuration."
+fi
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$current_branch" != "$required_before_branch" ]]; then
+  abort "Version bumps must be run from '$required_before_branch' (current branch: '$current_branch')."
+fi
+
 # Ensure VERSION file exists and read the current version
 if [ -f "VERSION" ]; then
   current_version=$(cat VERSION)
@@ -129,6 +142,11 @@ new_version="$major.$minor.$patch"
 if [[ "$current_version" == "$new_version" ]]; then
   abort "New version is the same as the current version."
 fi
+
+# Expose versions to hooks and run pre-bump hook
+export BUMPSTER_PREV_VERSION="$current_version"
+export BUMPSTER_NEW_VERSION="$new_version"
+run_hook "pre-bump"
 
 # Update the VERSION file and create a commit
 printf "$new_version" > VERSION
@@ -223,3 +241,6 @@ if [[ -n "$after_bump_branch" ]]; then
     git checkout "$default_master_branch" || abort "Failed to switch to branch '$default_master_branch'."
   fi
 fi
+
+# Run post-bump hook if available
+run_hook "post-bump"

@@ -24,3 +24,6 @@ SYNC_WITH_PACKAGE_JSON="false"
 
 # Branch to switch to after bumping version (default: dev)
 AFTER_BUMP_BRANCH="dev"
+
+# Branch that must be active before bumping (default: dev)
+BEFORE_BUMP_BRANCH="dev"

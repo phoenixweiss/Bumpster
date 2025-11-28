@@ -22,6 +22,7 @@ bin_dir="$BUMPSTER_HOME/bin"
 # Default branch names
 default_master_branch="main"
 default_develop_branch="dev"
+default_before_bump_branch="$default_develop_branch"
 default_logging="false"
 
 # Default behavior for feature branch management
@@ -30,6 +31,9 @@ ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
 
 # Default branch to switch to after bump (default to develop branch)
 AFTER_BUMP_BRANCH=${AFTER_BUMP_BRANCH:-"$default_develop_branch"}
+
+# Default branch that must be active before bumping (default to develop branch)
+BEFORE_BUMP_BRANCH=${BEFORE_BUMP_BRANCH:-"$default_before_bump_branch"}
 
 # Config variables (overridden by .bumpsterrc if present)
 master_branch=""
