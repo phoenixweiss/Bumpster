@@ -1,0 +1,30 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - skip-changelog
+  categories:
+    - title: Breaking changes
+      labels:
+        - breaking-change
+        - semver-major
+    - title: Features
+      labels:
+        - enhancement
+        - feature
+        - semver-minor
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+        - semver-patch
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Dependency updates
+      labels:
+        - dependencies
+    - title: Other changes
+      labels:
+        - "*"

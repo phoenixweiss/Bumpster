@@ -64,6 +64,16 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local message="${3:-Unexpected text was found}"
+
+  if [[ "$haystack" == *"$needle"* ]]; then
+    fail "$message (unexpected: '$needle')"
+  fi
+}
+
 assert_command_succeeds() {
   local message="$1"
   shift
@@ -221,6 +231,60 @@ test_fixture_uses_local_bare_remote() {
 
   assert_fixture_is_isolated ||
     fail "Fixture origin is not an isolated local bare repository"
+}
+
+test_release_notes_extract_version_section() {
+  cli_output="$(bash "$project_root/scripts/release-notes.sh" "0.8.2" 2>&1)"
+  cli_status=$?
+
+  assert_equal "0" "$cli_status" "Release notes extraction failed" || return 1
+  assert_contains "$cli_output" "one atomic push" \
+    "Expected 0.8.2 release note is missing" || return 1
+  assert_not_contains "$cli_output" "ShellCheck" \
+    "Release notes included the Unreleased section"
+}
+
+test_release_notes_reject_missing_version() {
+  cli_output="$(bash "$project_root/scripts/release-notes.sh" "9.9.9" 2>&1)"
+  cli_status=$?
+
+  [[ "$cli_status" -ne 0 ]] || fail "Missing CHANGELOG version unexpectedly succeeded" || return 1
+  assert_contains "$cli_output" "No CHANGELOG section found for version 9.9.9." \
+    "Missing CHANGELOG version error is unclear"
+}
+
+test_release_metadata_matches_published_refs() {
+  local release_commit
+
+  create_fixture "release-metadata" || return 1
+  run_bumpster --patch
+  assert_successful_release "0.8.1" || return 1
+  release_commit="$(git -C "$fixture_worktree" rev-list -n 1 v0.8.1)" || return 1
+
+  cli_output="$(
+    cd "$fixture_worktree" &&
+      bash "$project_root/scripts/validate-release.sh" \
+        v0.8.1 \
+        "$release_commit" \
+        main 2>&1
+  )"
+  cli_status=$?
+
+  assert_equal "0" "$cli_status" "Valid release metadata was rejected" || return 1
+  assert_equal "0.8.1" "$cli_output" "Release validation returned the wrong version" || return 1
+
+  cli_output="$(
+    cd "$fixture_worktree" &&
+      bash "$project_root/scripts/validate-release.sh" \
+        v0.8.1 \
+        0000000000000000000000000000000000000000 \
+        main 2>&1
+  )"
+  cli_status=$?
+
+  [[ "$cli_status" -ne 0 ]] || fail "Mismatched release commit unexpectedly succeeded" || return 1
+  assert_contains "$cli_output" "instead of workflow commit" \
+    "Mismatched release commit error is unclear"
 }
 
 test_patch_release_flow() {
@@ -475,6 +539,9 @@ main() {
     fail "Could not create the test directory" || return 1
 
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
+  run_test "release notes extract only the requested CHANGELOG section" test_release_notes_extract_version_section
+  run_test "release notes reject a version missing from CHANGELOG" test_release_notes_reject_missing_version
+  run_test "release metadata matches VERSION, tag, commit and origin/main" test_release_metadata_matches_published_refs
   run_test "patch release updates and pushes dev, main and tag" test_patch_release_flow
   run_test "minor release resets patch and publishes the release" test_minor_release_flow
   run_test "major release resets minor and patch and publishes the release" test_major_release_flow

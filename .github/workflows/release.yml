@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Required checks
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish GitHub Release
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag_name="$GITHUB_REF_NAME"
+          version="$(
+            ./scripts/validate-release.sh \
+              "$tag_name" \
+              "$GITHUB_SHA" \
+              main
+          )"
+
+          if gh release view "$tag_name" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            printf 'GitHub Release %s already exists.\n' "$tag_name" >&2
+            exit 1
+          fi
+
+          {
+            printf 'tag=%s\n' "$tag_name"
+            printf 'version=%s\n' "$version"
+            printf 'commit=%s\n' "$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          ./scripts/release-notes.sh \
+            "${{ steps.release.outputs.version }}" \
+            > "$RUNNER_TEMP/changelog-notes.md"
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          release_body="$(<"$RUNNER_TEMP/changelog-notes.md")"
+
+          jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg version "$RELEASE_VERSION" \
+            --arg commit "$RELEASE_COMMIT" \
+            --arg body "$release_body" \
+            '{
+              tag_name: $tag,
+              target_commitish: $commit,
+              name: ("Bumpster " + $version),
+              body: $body,
+              draft: false,
+              prerelease: false,
+              generate_release_notes: true,
+              make_latest: "true"
+            }' > "$RUNNER_TEMP/release-payload.json"
+
+          gh api \
+            --method POST \
+            "repos/$GITHUB_REPOSITORY/releases" \
+            --input "$RUNNER_TEMP/release-payload.json" \
+            --jq '.html_url'

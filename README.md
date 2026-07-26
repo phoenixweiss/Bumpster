@@ -311,6 +311,13 @@ Run the integration suite separately:
 ./tests/run.sh
 ```
 
+Release notes are maintained in the canonical English `CHANGELOG.md`. Preview
+the notes that would be published for a version with:
+
+```bash
+./scripts/release-notes.sh 0.8.2
+```
+
 Each scenario creates a temporary working repository, an isolated `HOME`, and a
 local bare remote. The suite never uses the project's real `origin`. To preserve
 the temporary repositories for inspection after a run:
@@ -324,7 +331,9 @@ uses the repository-level `.shellcheckrc` configuration.
 
 GitHub Actions runs the ShellCheck checks on Linux and macOS, validates the
 workflow files with actionlint, and runs the integration suite on Linux, macOS,
-and Windows with Git Bash.
+and Windows with Git Bash. A matching annotated `vMAJOR.MINOR.PATCH` tag starts
+the release workflow, which publishes the GitHub Release only after the same
+required checks pass.
 
 ## Uninstalling Bumpster
 

@@ -311,6 +311,13 @@ brew install shellcheck
 ./tests/run.sh
 ```
 
+Release notes ведутся в каноническом английском `CHANGELOG.md`. Предварительно
+просмотреть текст, который будет опубликован для версии, можно командой:
+
+```bash
+./scripts/release-notes.sh 0.8.2
+```
+
 Каждый сценарий создаёт временный рабочий репозиторий, изолированный `HOME` и
 локальный bare-remote. Тесты не используют настоящий `origin` проекта. Чтобы
 сохранить временные репозитории для изучения после запуска:
@@ -324,7 +331,9 @@ KEEP_TEST_TMP=true ./tests/run.sh
 
 GitHub Actions запускает ShellCheck в Linux и macOS, проверяет workflow-файлы
 через actionlint и выполняет интеграционные тесты в Linux, macOS и Windows с
-Git Bash.
+Git Bash. Подходящий аннотированный тег `vMAJOR.MINOR.PATCH` запускает release
+workflow, который публикует GitHub Release только после успешного прохождения
+тех же обязательных проверок.
 
 ## Удаление Bumpster
 
