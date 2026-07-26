@@ -364,31 +364,75 @@ EOS
   exit "${1:-0}"
 }
 
+# Function to validate release refs before the first local mutation
+preflight_release() {
+  local new_version="$1"
+  local develop_branch_name="$2"
+  local master_branch_name="$3"
+  local release_tag="v$new_version"
+  local remote_develop_ref="refs/remotes/origin/$develop_branch_name"
+  local remote_master_ref="refs/remotes/origin/$master_branch_name"
+  local local_master_ref="refs/heads/$master_branch_name"
+  local master_base_ref=""
+
+  log "Running release preflight checks."
+
+  if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+    abort "Release tag '$release_tag' already exists locally."
+  fi
+
+  if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" "refs/tags/$release_tag^{}" >/dev/null 2>&1; then
+    abort "Release tag '$release_tag' already exists on origin."
+  fi
+
+  git fetch --prune origin || abort "Failed to fetch current state from origin."
+
+  if git show-ref --verify --quiet "$remote_develop_ref"; then
+    if ! git merge-base --is-ancestor "$remote_develop_ref" "$develop_branch_name"; then
+      abort "Local branch '$develop_branch_name' is behind or has diverged from 'origin/$develop_branch_name'."
+    fi
+  fi
+
+  if git show-ref --verify --quiet "$local_master_ref" &&
+     git show-ref --verify --quiet "$remote_master_ref"; then
+    if [[ "$(git rev-parse "$local_master_ref")" != "$(git rev-parse "$remote_master_ref")" ]]; then
+      abort "Local branch '$master_branch_name' does not match 'origin/$master_branch_name'."
+    fi
+  fi
+
+  if git show-ref --verify --quiet "$local_master_ref"; then
+    master_base_ref="$local_master_ref"
+  elif git show-ref --verify --quiet "$remote_master_ref"; then
+    master_base_ref="$remote_master_ref"
+  fi
+
+  if [[ -n "$master_base_ref" ]] &&
+     ! git merge-base --is-ancestor "$master_base_ref" "$develop_branch_name"; then
+    abort "Development branch '$develop_branch_name' does not contain the current '$master_branch_name' history."
+  fi
+
+  log "Release preflight checks passed."
+}
+
 # Function to check if a branch exists locally or remotely, and create it if necessary
 check_or_create_branch() {
   local branch_name="$1"
+  local remote_ref="refs/remotes/origin/$branch_name"
 
   # Check if the branch exists locally
   if ! git show-ref --verify --quiet "refs/heads/$branch_name"; then
-    log "Branch '$branch_name' does not exist locally. Creating it."
-    git checkout -b "$branch_name" || abort "Failed to create branch '$branch_name'."
-    log "Branch '$branch_name' successfully created locally."
-
-    # Check if the branch needs to be pushed remotely
-    if ! git ls-remote --exit-code origin "$branch_name" &>/dev/null; then
-      log "Branch '$branch_name' does not exist remotely. Pushing it."
-      git push -u origin "$branch_name" || log "Failed to push branch '$branch_name' to remote." "WARN"
-      log "Branch '$branch_name' successfully pushed to remote."
+    if git show-ref --verify --quiet "$remote_ref"; then
+      log "Branch '$branch_name' exists only on origin. Creating a local tracking branch."
+      git checkout -b "$branch_name" --track "origin/$branch_name" ||
+        abort "Failed to create tracking branch '$branch_name' from 'origin/$branch_name'."
+    else
+      log "Branch '$branch_name' does not exist. Creating it from the current HEAD."
+      git checkout -b "$branch_name" || abort "Failed to create branch '$branch_name'."
     fi
+    log "Branch '$branch_name' successfully created locally."
   else
     log "Branch '$branch_name' already exists locally."
-
-    # Ensure the branch is tracking the remote one
     git checkout "$branch_name" || abort "Failed to switch to branch '$branch_name'."
-    if ! git ls-remote --exit-code origin "$branch_name" &>/dev/null; then
-      log "Branch '$branch_name' exists locally but not remotely. Pushing it."
-      git push -u origin "$branch_name"
-    fi
   fi
 }
 

@@ -104,6 +104,13 @@ if [[ "$current_branch" != "$required_before_branch" ]]; then
   abort "Version bumps must be run from '$required_before_branch' (current branch: '$current_branch')."
 fi
 
+# Resolve release branches before calculating and validating the release plan
+default_dev_branch=${develop_branch:-"$default_develop_branch"}
+default_master_branch=${master_branch:-"$default_master_branch"}
+
+export default_dev_branch
+export default_master_branch
+
 # Ensure VERSION file exists and read the current version
 if [ -f "VERSION" ]; then
   current_version=$(cat VERSION)
@@ -142,6 +149,9 @@ new_version="$major.$minor.$patch"
 if [[ "$current_version" == "$new_version" ]]; then
   abort "New version is the same as the current version."
 fi
+
+# Validate local and remote release state before running hooks or changing files
+preflight_release "$new_version" "$default_dev_branch" "$default_master_branch"
 
 # Expose versions to hooks and run pre-bump hook
 export BUMPSTER_PREV_VERSION="$current_version"
@@ -193,13 +203,6 @@ fi
 log "Switching to branch '$after_bump_branch'."
 git checkout "$after_bump_branch" || abort "Failed to switch to branch '$after_bump_branch'."
 
-default_dev_branch=${develop_branch:-"dev"}
-default_master_branch=${master_branch:-"main"}
-
-# Export variables if needed
-export default_dev_branch
-export default_master_branch
-
 log "Ensuring branch '$default_dev_branch' exists before merging."
 check_or_create_branch "$default_dev_branch"
 log "Switching to branch '$default_dev_branch' for merging."
@@ -208,7 +211,6 @@ log "Switching to branch '$default_dev_branch' for merging."
 if [[ "$current_branch" != "$default_dev_branch" && "$current_branch" != "$default_master_branch" ]]; then
   log "Merging current branch '$current_branch' into '$default_dev_branch'."
   git merge "$current_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
-  git push origin "$default_dev_branch"
 fi
 
 # Create a release from dev to main
@@ -219,17 +221,22 @@ log "Switching to branch '$default_master_branch' for releasing."
 
 log "Creating a release from '$default_dev_branch' to '$default_master_branch'."
 git merge "$default_dev_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
-git tag -a "v$new_version" -m "Release $new_version"
+git tag -a "v$new_version" -m "Release $new_version" ||
+  abort "Failed to create release tag 'v$new_version'."
 
-# Push the dev branch
-log "Pushing changes to development branch '$default_dev_branch'."
-git push origin "$default_dev_branch" || abort "Failed to push changes to remote branch '$default_dev_branch'."
-log "Development branch '$default_dev_branch' pushed to remote repository."
+# Publish both release branches and the tag as one remote transaction
+log "Publishing '$default_dev_branch', '$default_master_branch', and tag 'v$new_version' atomically."
+git push --atomic origin \
+  "$default_dev_branch" \
+  "$default_master_branch" \
+  "refs/tags/v$new_version" ||
+  abort "Failed to publish the release atomically. Remote release refs were not changed."
 
-# Push the main branch
-log "Pushing changes to main branch '$default_master_branch'."
-git push origin "$default_master_branch" --tags || abort "Failed to push changes to remote branch '$default_master_branch'."
-log "Main branch '$default_master_branch' pushed to remote repository."
+git branch --set-upstream-to="origin/$default_dev_branch" "$default_dev_branch" >/dev/null 2>&1 ||
+  log "Could not configure upstream for '$default_dev_branch'." "WARN"
+git branch --set-upstream-to="origin/$default_master_branch" "$default_master_branch" >/dev/null 2>&1 ||
+  log "Could not configure upstream for '$default_master_branch'." "WARN"
+log "Release branches and tag published successfully."
 
 # Switch to after bump branch if specified
 if [[ -n "$after_bump_branch" ]]; then
