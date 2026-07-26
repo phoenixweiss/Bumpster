@@ -299,6 +299,12 @@ brew install shellcheck
 ./scripts/quality.sh
 ```
 
+Чтобы проверить только синтаксис Bash без установленного ShellCheck:
+
+```bash
+./scripts/quality.sh --syntax-only
+```
+
 Интеграционные тесты запускаются отдельно:
 
 ```bash
@@ -315,6 +321,10 @@ KEEP_TEST_TMP=true ./tests/run.sh
 
 Рекомендуемое расширение VS Code указано в `.vscode/extensions.json` и
 использует репозиторную конфигурацию `.shellcheckrc`.
+
+GitHub Actions запускает ShellCheck в Linux и macOS, проверяет workflow-файлы
+через actionlint и выполняет интеграционные тесты в Linux, macOS и Windows с
+Git Bash.
 
 ## Удаление Bumpster
 

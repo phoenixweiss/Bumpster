@@ -299,6 +299,12 @@ Then run the syntax and static analysis checks from the project root:
 ./scripts/quality.sh
 ```
 
+To check Bash syntax without requiring ShellCheck:
+
+```bash
+./scripts/quality.sh --syntax-only
+```
+
 Run the integration suite separately:
 
 ```bash
@@ -315,6 +321,10 @@ KEEP_TEST_TMP=true ./tests/run.sh
 
 The recommended VS Code extension is listed in `.vscode/extensions.json` and
 uses the repository-level `.shellcheckrc` configuration.
+
+GitHub Actions runs the ShellCheck checks on Linux and macOS, validates the
+workflow files with actionlint, and runs the integration suite on Linux, macOS,
+and Windows with Git Bash.
 
 ## Uninstalling Bumpster
 

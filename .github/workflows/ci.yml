@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned ShellCheck
+        shell: bash
+        run: |
+          version="$(tr -d '[:space:]' < .shellcheck-version)"
+
+          case "$(uname -s):$(uname -m)" in
+            Linux:x86_64)
+              target="linux.x86_64"
+              expected_checksum="8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+              ;;
+            Darwin:arm64)
+              target="darwin.aarch64"
+              expected_checksum="56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79"
+              ;;
+            Darwin:x86_64)
+              target="darwin.x86_64"
+              expected_checksum="3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6"
+              ;;
+            *)
+              printf 'Unsupported ShellCheck runner: %s %s\n' "$(uname -s)" "$(uname -m)" >&2
+              exit 1
+              ;;
+          esac
+
+          archive="shellcheck-v${version}.${target}.tar.xz"
+          archive_path="$RUNNER_TEMP/$archive"
+          extracted_path="$RUNNER_TEMP/shellcheck-v${version}/shellcheck"
+          bin_path="$RUNNER_TEMP/bumpster-bin"
+
+          curl --fail --silent --show-error --location \
+            --output "$archive_path" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${version}/${archive}"
+
+          actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
+          if [[ "$actual_checksum" != "$expected_checksum" ]]; then
+            printf 'ShellCheck checksum mismatch.\n' >&2
+            exit 1
+          fi
+
+          tar -xJf "$archive_path" -C "$RUNNER_TEMP"
+          mkdir -p "$bin_path"
+          cp "$extracted_path" "$bin_path/shellcheck"
+          chmod +x "$bin_path/shellcheck"
+          printf '%s\n' "$bin_path" >> "$GITHUB_PATH"
+
+      - name: Run shell quality checks
+        shell: bash
+        run: ./scripts/quality.sh
+
+      - name: Install pinned actionlint
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          archive_path="$RUNNER_TEMP/$archive"
+          bin_path="$RUNNER_TEMP/bumpster-bin"
+
+          curl --fail --silent --show-error --location \
+            --output "$archive_path" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+
+          actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
+          if [[ "$actual_checksum" != "$ACTIONLINT_SHA256" ]]; then
+            printf 'actionlint checksum mismatch.\n' >&2
+            exit 1
+          fi
+
+          tar -xzf "$archive_path" -C "$bin_path" actionlint
+          chmod +x "$bin_path/actionlint"
+
+      - name: Validate GitHub Actions workflows
+        if: runner.os == 'Linux'
+        shell: bash
+        run: actionlint
+
+  integration:
+    name: Integration (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check Bash syntax
+        shell: bash
+        run: bash ./scripts/quality.sh --syntax-only
+
+      - name: Run integration tests
+        shell: bash
+        run: bash ./tests/run.sh
