@@ -284,7 +284,22 @@ AFTER_BUMP_BRANCH="dev"
 
 ## Разработка и тестирование
 
-Запустите интеграционные тесты из корня проекта:
+Проект использует версию ShellCheck, указанную в `.shellcheck-version`.
+Перед проверкой установите именно эту версию. На macOS с Homebrew:
+
+```bash
+brew install shellcheck
+```
+
+Для других платформ используйте пакеты из
+[официального релиза ShellCheck](https://github.com/koalaman/shellcheck/releases/latest).
+Затем запустите проверку синтаксиса и статический анализ из корня проекта:
+
+```bash
+./scripts/quality.sh
+```
+
+Интеграционные тесты запускаются отдельно:
 
 ```bash
 ./tests/run.sh
@@ -297,6 +312,9 @@ AFTER_BUMP_BRANCH="dev"
 ```bash
 KEEP_TEST_TMP=true ./tests/run.sh
 ```
+
+Рекомендуемое расширение VS Code указано в `.vscode/extensions.json` и
+использует репозиторную конфигурацию `.shellcheckrc`.
 
 ## Удаление Bumpster
 

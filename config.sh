@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Variables in this file are intentionally consumed by scripts that source it.
+# shellcheck disable=SC2034
+
 # Enable strict mode
 set -u
 

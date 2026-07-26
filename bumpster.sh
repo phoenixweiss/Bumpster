@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do
     -l | --create-local-config )    create_local_config="true" ;;
     -f | --create-feature )         create_feature_branch="true" ;;
     -c | --close-feature )          close_feature_branch="true" ;;
-    *)                              printf "Unknown option: '$1'\n" >&2
+    *)                              printf "Unknown option: '%s'\n" "$1" >&2
     usage 1 ;;
   esac
   shift
@@ -75,7 +75,8 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # Ensure necessary commands are available
-for cmd in git; do
+required_commands=(git)
+for cmd in "${required_commands[@]}"; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     abort "Error: $cmd is not installed. Please install it and try again."
   fi
@@ -117,7 +118,7 @@ if [ -f "VERSION" ]; then
   log "Current version is $current_version"
 else
   current_version="0.0.0"
-  printf "$current_version" > VERSION
+  printf '%s' "$current_version" > VERSION
   log "The VERSION file is created and filled with the value $current_version"
   log "Initialization complete with version $current_version."
   git add VERSION
@@ -127,7 +128,7 @@ fi
 
 # Prompt for version type if not provided
 if [ -z "$version_type" ]; then
-  read -p "Which version do you want to bump (major/minor/patch)? [patch]: " version_type
+  read -r -p "Which version do you want to bump (major/minor/patch)? [patch]: " version_type
   version_type=${version_type:-patch}
 fi
 
@@ -159,7 +160,7 @@ export BUMPSTER_NEW_VERSION="$new_version"
 run_hook "pre-bump"
 
 # Update the VERSION file and create a commit
-printf "$new_version" > VERSION
+printf '%s' "$new_version" > VERSION
 git add VERSION
 
 # Synchronize version with package.json if enabled

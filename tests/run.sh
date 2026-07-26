@@ -188,6 +188,8 @@ install_main_rejecting_hook() {
   {
     printf '#!/usr/bin/env bash\n'
     printf 'while read -r old_value new_value ref_name; do\n'
+    # The generated hook must contain the literal variable reference.
+    # shellcheck disable=SC2016
     printf '  if [[ "$ref_name" == "refs/heads/main" ]]; then\n'
     printf '    exit 1\n'
     printf '  fi\n'

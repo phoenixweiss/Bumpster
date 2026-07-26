@@ -284,7 +284,22 @@ Before using Bumpster, ensure you have an initialized Git repository.
 
 ## Development and Testing
 
-Run the integration suite from the project root:
+The project uses the ShellCheck version recorded in `.shellcheck-version`.
+Install that version before running the quality checks. On macOS with Homebrew:
+
+```bash
+brew install shellcheck
+```
+
+For other platforms, use the packages from the
+[official ShellCheck release](https://github.com/koalaman/shellcheck/releases/latest).
+Then run the syntax and static analysis checks from the project root:
+
+```bash
+./scripts/quality.sh
+```
+
+Run the integration suite separately:
 
 ```bash
 ./tests/run.sh
@@ -297,6 +312,9 @@ the temporary repositories for inspection after a run:
 ```bash
 KEEP_TEST_TMP=true ./tests/run.sh
 ```
+
+The recommended VS Code extension is listed in `.vscode/extensions.json` and
+uses the repository-level `.shellcheckrc` configuration.
 
 ## Uninstalling Bumpster
 

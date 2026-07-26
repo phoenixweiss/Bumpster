@@ -1,5 +1,6 @@
 {
   "recommendations": [
-    "shakram02.bash-beautify"
+    "shakram02.bash-beautify",
+    "timonwong.shellcheck"
   ]
 }

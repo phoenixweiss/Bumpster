@@ -1,4 +1,5 @@
 {
+  "shellcheck.run": "onSave",
   "cSpell.words": [
     "бамп",
     "бампа",

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This library is sourced only after config.sh and also exposes state to its caller.
+# shellcheck disable=SC2034,SC2154
+
 # Function to log actions with simple severity levels
 log() {
   local message="$1"
@@ -13,7 +16,8 @@ log() {
   fi
 
   if [[ "$logging_enabled" == "true" ]]; then
-    local timestamped_message="$(date '+%Y-%m-%d %H:%M:%S') $formatted"
+    local timestamped_message
+    timestamped_message="$(date '+%Y-%m-%d %H:%M:%S') $formatted"
     echo "$timestamped_message" >> "$log_file"
   fi
 }
@@ -21,7 +25,8 @@ log() {
 # Function to run custom hooks (project-level takes priority over global)
 run_hook() {
   local hook_name="$1"
-  local project_hook_path="$(pwd)/.bumpster/hooks/$hook_name"
+  local project_hook_path
+  project_hook_path="$(pwd)/.bumpster/hooks/$hook_name"
   local global_hook_path="$BUMPSTER_HOME/hooks/$hook_name"
   local hook_to_run=""
 
@@ -108,43 +113,43 @@ interactive_setup() {
   local config_file="${1:-$global_config_file}"
   echo "Welcome to Bumpster setup!"
 
-  read -p "Enter the name for the master branch [default: $default_master_branch]: " master_branch_input
+  read -r -p "Enter the name for the master branch [default: $default_master_branch]: " master_branch_input
   master_branch=${master_branch_input:-$default_master_branch}
 
-  read -p "Enter the name for the develop branch [default: $default_develop_branch]: " develop_branch_input
+  read -r -p "Enter the name for the develop branch [default: $default_develop_branch]: " develop_branch_input
   develop_branch=${develop_branch_input:-$default_develop_branch}
 
-  read -p "Enable logging? (y/n) [default: no]: " logging_input
+  read -r -p "Enable logging? (y/n) [default: no]: " logging_input
   logging_enabled="false"
   if [[ "$logging_input" =~ ^(y|Y|yes|Yes)$ ]]; then
     logging_enabled="true"
   fi
 
-  read -p "Enter the log file path [default: $default_log_file]: " log_file_input
+  read -r -p "Enter the log file path [default: $default_log_file]: " log_file_input
   log_file=${log_file_input:-$default_log_file}
 
-  read -p "Automatically delete feature branches after merge? (y/n) [default: no]: " delete_feature_input
+  read -r -p "Automatically delete feature branches after merge? (y/n) [default: no]: " delete_feature_input
   delete_feature="false"
   if [[ "$delete_feature_input" =~ ^(y|Y|yes|Yes)$ ]]; then
     delete_feature="true"
   fi
 
-  read -p "Ask before deleting feature branches? (y/n) [default: yes]: " ask_before_deleting_input
+  read -r -p "Ask before deleting feature branches? (y/n) [default: yes]: " ask_before_deleting_input
   ask_before_deleting="true"
   if [[ "$ask_before_deleting_input" =~ ^(n|N|no|No)$ ]]; then
     ask_before_deleting="false"
   fi
 
-  read -p "Synchronize VERSION file with package.json? (y/n) [default: no]: " sync_with_package_input
+  read -r -p "Synchronize VERSION file with package.json? (y/n) [default: no]: " sync_with_package_input
   sync_with_package="false"
   if [[ "$sync_with_package_input" =~ ^(y|Y|yes|Yes)$ ]]; then
     sync_with_package="true"
   fi
 
-  read -p "Enter the branch to switch to after version bump [default: $default_develop_branch]: " after_bump_branch_input
+  read -r -p "Enter the branch to switch to after version bump [default: $default_develop_branch]: " after_bump_branch_input
   after_bump_branch=${after_bump_branch_input:-$default_develop_branch}
 
-  read -p "Enter the branch that must be active before bumping [default: $default_develop_branch]: " before_bump_branch_input
+  read -r -p "Enter the branch that must be active before bumping [default: $default_develop_branch]: " before_bump_branch_input
   before_bump_branch=${before_bump_branch_input:-$default_develop_branch}
 
   # Create the config file based on user input
@@ -153,7 +158,8 @@ interactive_setup() {
 
 # Function to create a local config file in the current directory
 create_local_config_file() {
-  local current_dir=$(pwd)
+  local current_dir
+  current_dir=$(pwd)
   local local_config_file="$current_dir/.bumpsterrc"
 
   if [ -f "$local_config_file" ]; then
@@ -167,6 +173,8 @@ create_local_config_file() {
 # Function to load configuration from a config file
 load_config() {
   if [ -f "$1" ]; then
+    # The configuration path is selected at runtime by design.
+    # shellcheck disable=SC1090
     source "$1"
     master_branch="${GIT_MASTER_BRANCH:-$default_master_branch}"
     develop_branch="${GIT_DEVELOP_BRANCH:-$default_develop_branch}"
@@ -188,10 +196,8 @@ post_install() {
 
   # Make the main script executable
   log "Setting executable permissions for bumpster.sh"
-  chmod +x "$BUMPSTER_HOME/bumpster.sh"
-
   # Check if chmod was successful
-  if [ $? -ne 0 ]; then
+  if ! chmod +x "$BUMPSTER_HOME/bumpster.sh"; then
     log "Failed to set executable permissions for bumpster.sh" "WARN"
     echo "Please manually set the execution permissions:"
     echo "  chmod +x $BUMPSTER_HOME/bumpster.sh"
@@ -262,7 +268,8 @@ update_bumpster() {
     log "Backup created at $backup_dir."
 
     # Download and extract the latest version to a temporary directory
-    local temp_dir=$(mktemp -d)
+    local temp_dir
+    temp_dir=$(mktemp -d)
     if ! curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$temp_dir"; then
       abort "Failed to download and extract the latest Bumpster archive."
     fi
@@ -293,7 +300,8 @@ update_bumpster() {
 
 # Function to check repository status
 check_status() {
-  local current_branch=$(git rev-parse --abbrev-ref HEAD)
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
   log "Current branch: $current_branch"
 
   local effective_develop_branch="${develop_branch:-$default_develop_branch}"
@@ -454,7 +462,7 @@ create_feature() {
   # Prompt for the feature branch name
   local feature_branch_name
   while true; do
-    read -p "Enter the name for the new feature branch: " feature_branch_name
+    read -r -p "Enter the name for the new feature branch: " feature_branch_name
     # Validate the branch name
     if [[ -z "$feature_branch_name" ]]; then
       echo "Branch name cannot be empty. Please try again."
@@ -488,7 +496,7 @@ close_feature() {
 
   if [[ -n $(git status --porcelain) ]]; then
     log "You have uncommitted changes in your working directory."
-    read -p "Do you want to stash these changes before proceeding? (y/n): " stash_response
+    read -r -p "Do you want to stash these changes before proceeding? (y/n): " stash_response
     if [[ "$stash_response" =~ ^(y|Y|yes|Yes)$ ]]; then
       git stash push -m "Auto-stash before closing feature branch" || abort "Failed to stash changes."
       log "Uncommitted changes stashed successfully."
@@ -520,7 +528,7 @@ close_feature() {
   # Handle branch deletion based on configuration
   if [[ "$delete_feature_branch_after_merge" == "true" || "$ask_before_deleting_feature_branch" == "true" ]]; then
     if [[ "$ask_before_deleting_feature_branch" == "true" ]]; then
-      read -p "Do you want to delete the feature branch '$current_branch'? (y/n): " delete_response
+      read -r -p "Do you want to delete the feature branch '$current_branch'? (y/n): " delete_response
       if [[ "$delete_response" =~ ^(y|Y|yes|Yes)$ ]]; then
         if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
           abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
@@ -556,11 +564,11 @@ close_feature() {
   fi
 
   # Apply stashed changes back if needed
-  if [[ -n $(git stash list | grep "Auto-stash before closing feature branch") ]]; then
+  if git stash list | grep -q "Auto-stash before closing feature branch"; then
     log "Checking for stashed changes to apply..."
-    if [[ -z $(git diff HEAD stash@{0}) ]]; then
+    if [[ -z $(git diff HEAD 'stash@{0}') ]]; then
       log "No changes from stash need to be applied."
-      git stash drop stash@{0} || log "Failed to drop stash. You can manually clean it up." "WARN"
+      git stash drop 'stash@{0}' || log "Failed to drop stash. You can manually clean it up." "WARN"
     else
       log "Applying stashed changes back."
       git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'." "WARN"
