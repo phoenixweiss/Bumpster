@@ -29,7 +29,18 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 fail() {
-  printf '    %s\n' "$*" >&2
+  local message="$*"
+  local annotation_message
+
+  printf '    %s\n' "$message" >&2
+
+  if [[ "${GITHUB_ACTIONS:-false}" == "true" ]]; then
+    annotation_message="${message//'%'/'%25'}"
+    annotation_message="${annotation_message//$'\r'/'%0D'}"
+    annotation_message="${annotation_message//$'\n'/'%0A'}"
+    printf '::error title=Bumpster integration test::%s\n' "$annotation_message"
+  fi
+
   return 1
 }
 
@@ -94,17 +105,23 @@ create_fixture() {
 
 assert_fixture_is_isolated() {
   local remote_url
+  local remote_path
+  local expected_origin_path
+  local expected_suite_path
   local is_bare
 
   remote_url="$(git -C "$fixture_worktree" remote get-url origin)" || return 1
+  remote_path="$(cd "$remote_url" 2>/dev/null && pwd -P)" || return 1
+  expected_origin_path="$(cd "$fixture_origin" && pwd -P)" || return 1
+  expected_suite_path="$(cd "$suite_root" && pwd -P)" || return 1
   is_bare="$(git --git-dir="$fixture_origin" rev-parse --is-bare-repository)" || return 1
 
-  case "$remote_url" in
-    "$suite_root"/*) ;;
+  case "$expected_origin_path" in
+    "$expected_suite_path"/*) ;;
     *) return 1 ;;
   esac
 
-  [[ "$is_bare" == "true" ]]
+  [[ "$remote_path" == "$expected_origin_path" && "$is_bare" == "true" ]]
 }
 
 run_bumpster() {
