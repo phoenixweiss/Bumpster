@@ -277,6 +277,22 @@ AFTER_BUMP_BRANCH="dev"
 
 Before using Bumpster, ensure you have an initialized Git repository.
 
+## Development and Testing
+
+Run the integration suite from the project root:
+
+```bash
+./tests/run.sh
+```
+
+Each scenario creates a temporary working repository, an isolated `HOME`, and a
+local bare remote. The suite never uses the project's real `origin`. To preserve
+the temporary repositories for inspection after a run:
+
+```bash
+KEEP_TEST_TMP=true ./tests/run.sh
+```
+
 ## Uninstalling Bumpster
 
 To completely remove Bumpster, delete the `~/.bumpster` directory:
