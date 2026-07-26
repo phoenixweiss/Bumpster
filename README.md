@@ -1,5 +1,8 @@
 # Bumpster
 
+[![CI](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/phoenixweiss/Bumpster?display_name=tag&sort=semver)](https://github.com/phoenixweiss/Bumpster/releases/latest)
+
 ```ascii
     _____                                 __
    / _  / __  __ ____ ___   ____   _____ / /_ ___   _____
@@ -315,7 +318,7 @@ Release notes are maintained in the canonical English `CHANGELOG.md`. Preview
 the notes that would be published for a version with:
 
 ```bash
-./scripts/release-notes.sh 0.8.2
+./scripts/release-notes.sh 0.8.3
 ```
 
 Each scenario creates a temporary working repository, an isolated `HOME`, and a

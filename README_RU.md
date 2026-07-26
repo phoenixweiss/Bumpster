@@ -1,5 +1,8 @@
 # Bumpster
 
+[![CI](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/phoenixweiss/Bumpster?display_name=tag&sort=semver)](https://github.com/phoenixweiss/Bumpster/releases/latest)
+
 ```ascii
     _____                                 __
    / _  / __  __ ____ ___   ____   _____ / /_ ___   _____
@@ -315,7 +318,7 @@ Release notes ведутся в каноническом английском `C
 просмотреть текст, который будет опубликован для версии, можно командой:
 
 ```bash
-./scripts/release-notes.sh 0.8.2
+./scripts/release-notes.sh 0.8.3
 ```
 
 Каждый сценарий создаёт временный рабочий репозиторий, изолированный `HOME` и

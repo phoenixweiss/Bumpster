@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-07-27
+
 ### Added
 
 - A pinned ShellCheck `0.11.0` development workflow and a single local quality
@@ -19,6 +21,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Dependabot.
 - Automated GitHub Release publication after all required checks pass for a
   matching annotated semantic-version tag.
+- A canonical English changelog with verified release notes for the key
+  `0.7.0` through `0.8.2` milestones.
+- A retrospective GitHub Release for `v0.8.2`, establishing the release history
+  before automated publication begins.
+- CI and latest-release badges in the English and Russian documentation.
 
 ### Changed
 
@@ -98,7 +105,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.7.0...v0.8.0
