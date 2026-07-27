@@ -54,6 +54,41 @@ echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
+### Переход с 0.8.x
+
+Версии до `0.8.x` включительно используют старую схему обновления: скачивают
+исходный архив ветки `main` и целиком заменяют директорию `~/.bumpster`. Не
+используйте старую команду `bumpster --update` для одноразового перехода на
+`0.9.0`, особенно если в `~/.bumpster/hooks` находятся пользовательские hooks.
+
+Проверенный путь миграции станет доступен после выпуска `v0.9.0`. Перед первым
+переходом сохраните отдельную копию текущей установки:
+
+```bash
+backup_dir="$HOME/.bumpster-backup-$(date +%Y%m%d-%H%M%S)"
+cp -R "$HOME/.bumpster" "$backup_dir"
+printf 'Backup: %s\n' "$backup_dir"
+```
+
+Затем запустите installer, закреплённый за первым asset-based Release:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/v0.9.0/install.sh)"
+bumpster --version
+```
+
+Installer `0.9.0` должен загрузить и проверить версионный runtime asset из
+GitHub Release, сохранить пользовательские hooks и конфигурацию, а при ошибке
+восстановить прежнюю установку. После этой одноразовой миграции последующие
+запуски `bumpster --update` используют ту же проверяемую схему Release assets.
+Глобальный `~/.bumpsterrc` и проектные файлы `.bumpsterrc` находятся вне
+runtime-директории и остаются на месте.
+
+> Эта команда предназначена только для `v0.9.0` и более новых версий. Пока
+> такой Release и его runtime assets не существуют, сохраните текущую установку
+> либо обновляйтесь только после ручного backup и проверки результата старого
+> updater.
+
 ## Использование
 
 ### Предварительные проверки
@@ -162,13 +197,17 @@ bump -h
 
 ### Обновление Bumpster
 
-Обновить Bumpster до последней версии:
+После перехода на `0.9.0` или более новую версию обновить Bumpster до последней
+стабильной версии можно командами:
 
 ```bash
 bumpster --update
 # или
 bump -u
 ```
+
+Если `bumpster --version` выводит версию `0.8.x`, вместо старого updater
+используйте раздел [«Переход с 0.8.x»](#переход-с-08x).
 
 ### Настройка имен веток
 
@@ -378,7 +417,22 @@ GitHub Actions запускает ShellCheck в Linux и macOS, проверяе
 через actionlint и выполняет интеграционные тесты в Linux, macOS и Windows с
 Git Bash. Подходящий аннотированный тег `vMAJOR.MINOR.PATCH` запускает release
 workflow, который публикует GitHub Release только после успешного прохождения
-тех же обязательных проверок.
+тех же обязательных проверок. Начиная с `0.9.0`, workflow собирает
+runtime-архив из помеченного тегом коммита, проверяет его checksum и точный
+состав, генерирует SLSA build provenance и загружает в draft Release только
+архив и `SHA256SUMS`. Release становится публичным и latest только после
+проверки его assets.
+
+После загрузки обоих runtime assets проверить checksum и GitHub artifact
+attestation можно командами:
+
+```bash
+shasum -a 256 -c SHA256SUMS
+gh attestation verify bumpster-X.Y.Z.tar.gz --repo phoenixweiss/Bumpster
+```
+
+Checksum подтверждает байты загруженного файла. Attestation дополнительно
+связывает runtime-архив с репозиторием Bumpster и его сборкой в GitHub Actions.
 
 ## Удаление Bumpster
 

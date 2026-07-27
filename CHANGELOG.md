@@ -16,6 +16,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - An acceptance test proving repeated builds are byte-identical, the packaged
   CLI is executable, and no documentation, tests, CI, installer, or development
   files enter the runtime archive.
+- SLSA build provenance for the runtime archive, generated with GitHub artifact
+  attestations and verified before release publication.
+
+### Changed
+
+- The release workflow now creates a draft, uploads and verifies the exact
+  runtime archive and checksum assets, and only then publishes it as the latest
+  GitHub Release.
+- The installation guide now defines a one-time migration path from the legacy
+  `0.8.x` source-archive updater to the verified Release-asset scheme.
 
 ## [0.8.5] - 2026-07-27
 

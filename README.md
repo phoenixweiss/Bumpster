@@ -54,6 +54,40 @@ echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
+### Migrating from 0.8.x
+
+Versions through `0.8.x` use the legacy updater: it downloads the source archive
+of the `main` branch and replaces the entire `~/.bumpster` directory. Do not use
+the old `bumpster --update` command for the one-time transition to `0.9.0`,
+especially if you keep custom hooks in `~/.bumpster/hooks`.
+
+The verified migration path becomes available when `v0.9.0` is released. Before
+the first transition, keep a separate copy of the existing installation:
+
+```bash
+backup_dir="$HOME/.bumpster-backup-$(date +%Y%m%d-%H%M%S)"
+cp -R "$HOME/.bumpster" "$backup_dir"
+printf 'Backup: %s\n' "$backup_dir"
+```
+
+Then run the installer pinned to the first asset-based release:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/v0.9.0/install.sh)"
+bumpster --version
+```
+
+The `0.9.0` installer must download and verify the versioned GitHub Release
+runtime asset, preserve user hooks and configuration, and restore the previous
+installation if the transition fails. After this one-time migration, future
+`bumpster --update` operations use the same verified Release-asset scheme.
+Global `~/.bumpsterrc` and project-level `.bumpsterrc` files are outside the
+runtime directory and remain in place.
+
+> This command is intentionally for `v0.9.0` and later. Until that Release and
+> its runtime assets exist, keep the current installation or update only with a
+> manual backup and inspection of the legacy updater's result.
+
 ## Usage
 
 ### Pre-flight Checks
@@ -162,13 +196,18 @@ bump -h
 
 ### Updating Bumpster
 
-Update Bumpster to the latest version:
+After migrating to `0.9.0` or later, update Bumpster to the latest stable
+version:
 
 ```bash
 bumpster --update
 # or
 bump -u
 ```
+
+If `bumpster --version` reports `0.8.x`, follow
+[Migrating from 0.8.x](#migrating-from-08x) instead of running the legacy
+updater.
 
 ### Customizing Branch Names
 
@@ -379,7 +418,22 @@ GitHub Actions runs the ShellCheck checks on Linux and macOS, validates the
 workflow files with actionlint, and runs the integration suite on Linux, macOS,
 and Windows with Git Bash. A matching annotated `vMAJOR.MINOR.PATCH` tag starts
 the release workflow, which publishes the GitHub Release only after the same
-required checks pass.
+required checks pass. Starting with `0.9.0`, the workflow builds the runtime
+archive from the tagged commit, verifies its checksum and exact contents,
+generates SLSA build provenance, and uploads only the archive and `SHA256SUMS` to
+a draft Release. The Release becomes public and latest only after its assets
+have been verified.
+
+After downloading both runtime assets, verify the checksum and the GitHub
+artifact attestation with:
+
+```bash
+shasum -a 256 -c SHA256SUMS
+gh attestation verify bumpster-X.Y.Z.tar.gz --repo phoenixweiss/Bumpster
+```
+
+The checksum verifies the downloaded bytes. The attestation additionally ties
+the runtime archive to the Bumpster repository and its GitHub Actions build.
 
 ## Uninstalling Bumpster
 
