@@ -372,6 +372,169 @@ EOS
   exit "${1:-0}"
 }
 
+# Function to validate a local branch's configured upstream
+validate_release_upstream() {
+  local branch_name="$1"
+  local configured_remote=""
+  local configured_merge=""
+  local expected_merge="refs/heads/$branch_name"
+  local actual_upstream=""
+
+  configured_remote="$(git config --get "branch.$branch_name.remote" 2>/dev/null || true)"
+  configured_merge="$(git config --get "branch.$branch_name.merge" 2>/dev/null || true)"
+
+  if [[ -z "$configured_remote" || -z "$configured_merge" ]]; then
+    abort "Branch '$branch_name' must track 'origin/$branch_name' before release."
+  fi
+
+  if [[ "$configured_remote" != "origin" || "$configured_merge" != "$expected_merge" ]]; then
+    if [[ "$configured_merge" == refs/heads/* ]]; then
+      actual_upstream="$configured_remote/${configured_merge#refs/heads/}"
+    else
+      actual_upstream="$configured_remote:$configured_merge"
+    fi
+    abort "Branch '$branch_name' tracks '$actual_upstream'; expected 'origin/$branch_name'."
+  fi
+}
+
+# Function to find one exact ref in git ls-remote output
+remote_ref_sha() {
+  local remote_refs="$1"
+  local ref_name="$2"
+
+  printf '%s\n' "$remote_refs" |
+    awk -v expected_ref="$ref_name" '$2 == expected_ref { print $1; exit }'
+}
+
+# Function to report preserved local and remote state after a release failure
+report_release_failure() {
+  local exit_status="$1"
+  local current_branch=""
+  local current_head=""
+  local worktree_state=""
+  local tag_state="absent"
+  local remote_refs=""
+  local remote_develop_sha="absent"
+  local remote_master_sha="absent"
+  local remote_tag_sha="absent"
+  local remote_state="unavailable"
+  local remote_check_command=""
+  local retry_command=""
+  local merge_head_path=""
+
+  if [[ "$exit_status" -eq 0 || "${release_diagnostics_active:-false}" != "true" ]]; then
+    return
+  fi
+
+  current_branch="$(git branch --show-current 2>/dev/null || true)"
+  if [[ -z "$current_branch" ]]; then
+    current_branch="detached or unavailable"
+  fi
+  current_head="$(git rev-parse --short HEAD 2>/dev/null || true)"
+  if [[ -z "$current_head" ]]; then
+    current_head="unavailable"
+  fi
+  if worktree_state="$(git status --porcelain 2>/dev/null)"; then
+    if [[ -n "$worktree_state" ]]; then
+      worktree_state="has local changes"
+    else
+      worktree_state="clean"
+    fi
+  else
+    worktree_state="unavailable"
+  fi
+  if git show-ref --verify --quiet "refs/tags/$release_tag_name"; then
+    tag_state="present"
+  fi
+
+  if remote_refs="$(
+    git ls-remote origin \
+      "refs/heads/$release_develop_branch" \
+      "refs/heads/$release_master_branch" \
+      "refs/tags/$release_tag_name" \
+      "refs/tags/$release_tag_name^{}" 2>/dev/null
+  )"; then
+    remote_develop_sha="$(
+      remote_ref_sha "$remote_refs" "refs/heads/$release_develop_branch"
+    )"
+    remote_master_sha="$(
+      remote_ref_sha "$remote_refs" "refs/heads/$release_master_branch"
+    )"
+    remote_tag_sha="$(
+      remote_ref_sha "$remote_refs" "refs/tags/$release_tag_name"
+    )"
+    remote_develop_sha="${remote_develop_sha:-absent}"
+    remote_master_sha="${remote_master_sha:-absent}"
+    remote_tag_sha="${remote_tag_sha:-absent}"
+
+    if [[ "$remote_develop_sha" == "$release_initial_remote_develop_sha" &&
+          "$remote_master_sha" == "$release_initial_remote_master_sha" &&
+          "$remote_tag_sha" == "absent" ]]; then
+      remote_state="unchanged"
+    else
+      remote_state="changed"
+    fi
+  fi
+
+  log "Release '$release_tag_name' stopped during '$release_stage'." "ERROR"
+  if [[ "${release_published:-false}" == "true" ]]; then
+    log "The release was published before this later step failed. Do not recreate its tag or repeat the publication." "ERROR"
+  else
+    log "No automatic rollback was attempted; local release state was preserved for inspection." "ERROR"
+  fi
+  log "Recovery state: branch '$current_branch', HEAD '$current_head', working tree $worktree_state, local tag $tag_state." "ERROR"
+
+  case "$remote_state" in
+    unchanged)
+      log "Remote release refs are unchanged from preflight." "ERROR"
+      ;;
+    changed)
+      log "Remote release refs differ from preflight; inspect them before taking any recovery action." "ERROR"
+      ;;
+    *)
+      log "Remote release refs could not be verified; do not assume publication failed or succeeded." "ERROR"
+      ;;
+  esac
+
+  printf -v remote_check_command \
+    'git ls-remote origin %q %q %q %q' \
+    "refs/heads/$release_develop_branch" \
+    "refs/heads/$release_master_branch" \
+    "refs/tags/$release_tag_name" \
+    "refs/tags/$release_tag_name^{}"
+  log "Inspect the preserved state with:" "ERROR"
+  log "  git status" "ERROR"
+  log "  git log --oneline --decorate --graph --all" "ERROR"
+  log "  $remote_check_command" "ERROR"
+
+  merge_head_path="$(git rev-parse --git-path MERGE_HEAD 2>/dev/null || true)"
+  if [[ -n "$merge_head_path" && -f "$merge_head_path" ]]; then
+    log "An unfinished merge is present. To abandon only that merge, run:" "ERROR"
+    log "  git merge --abort" "ERROR"
+  fi
+
+  if [[ "$remote_state" == "unchanged" &&
+        "$release_stage" == "atomic publication" &&
+        "$tag_state" == "present" ]]; then
+    printf -v retry_command \
+      'git push --atomic origin %q %q %q' \
+      "refs/heads/$release_develop_branch" \
+      "refs/heads/$release_master_branch" \
+      "refs/tags/$release_tag_name"
+    log "After fixing the rejection, the preserved release can be retried with:" "ERROR"
+    log "  $retry_command" "ERROR"
+  fi
+}
+
+# EXIT trap entry point that preserves the original failure status
+release_exit_handler() {
+  local exit_status="$1"
+
+  trap - EXIT
+  report_release_failure "$exit_status"
+  exit "$exit_status"
+}
+
 # Function to validate release refs before the first local mutation
 preflight_release() {
   local new_version="$1"
@@ -382,27 +545,80 @@ preflight_release() {
   local remote_master_ref="refs/remotes/origin/$master_branch_name"
   local local_master_ref="refs/heads/$master_branch_name"
   local master_base_ref=""
+  local remote_refs=""
+  local remote_develop_sha=""
+  local remote_master_sha=""
+  local remote_tag_sha=""
 
   log "Running release preflight checks."
 
+  if ! git check-ref-format --branch "$develop_branch_name" >/dev/null 2>&1; then
+    abort "Configured development branch name '$develop_branch_name' is invalid."
+  fi
+  if ! git check-ref-format --branch "$master_branch_name" >/dev/null 2>&1; then
+    abort "Configured main branch name '$master_branch_name' is invalid."
+  fi
+  if [[ "$develop_branch_name" == "$master_branch_name" ]]; then
+    abort "Development and main branch names must be different."
+  fi
+
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    abort "Remote 'origin' is not configured."
+  fi
+  if ! git remote get-url --push origin >/dev/null 2>&1; then
+    abort "Remote 'origin' has no push URL configured."
+  fi
+
+  validate_release_upstream "$develop_branch_name"
+  if git show-ref --verify --quiet "$local_master_ref"; then
+    validate_release_upstream "$master_branch_name"
+  fi
+
+  if ! remote_refs="$(
+    git ls-remote origin \
+      "refs/heads/$develop_branch_name" \
+      "refs/heads/$master_branch_name" \
+      "refs/tags/$release_tag" \
+      "refs/tags/$release_tag^{}"
+  )"; then
+    abort "Failed to query release refs from origin. Check its URL and access."
+  fi
+
+  remote_develop_sha="$(
+    remote_ref_sha "$remote_refs" "refs/heads/$develop_branch_name"
+  )"
+  remote_master_sha="$(
+    remote_ref_sha "$remote_refs" "refs/heads/$master_branch_name"
+  )"
+  remote_tag_sha="$(remote_ref_sha "$remote_refs" "refs/tags/$release_tag")"
+
+  if [[ -n "$remote_tag_sha" ]]; then
+    abort "Release tag '$release_tag' already exists on origin."
+  fi
   if git show-ref --verify --quiet "refs/tags/$release_tag"; then
     abort "Release tag '$release_tag' already exists locally."
   fi
 
-  if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" "refs/tags/$release_tag^{}" >/dev/null 2>&1; then
-    abort "Release tag '$release_tag' already exists on origin."
+  git fetch --prune origin ||
+    abort "Failed to fetch current state from origin. Check its URL, access, and fetch configuration."
+
+  if [[ -n "$remote_develop_sha" ]] &&
+     ! git show-ref --verify --quiet "$remote_develop_ref"; then
+    abort "Remote branch 'origin/$develop_branch_name' exists but was not fetched. Check remote.origin.fetch."
+  fi
+  if [[ -n "$remote_master_sha" ]] &&
+     ! git show-ref --verify --quiet "$remote_master_ref"; then
+    abort "Remote branch 'origin/$master_branch_name' exists but was not fetched. Check remote.origin.fetch."
   fi
 
-  git fetch --prune origin || abort "Failed to fetch current state from origin."
-
-  if git show-ref --verify --quiet "$remote_develop_ref"; then
+  if [[ -n "$remote_develop_sha" ]]; then
     if ! git merge-base --is-ancestor "$remote_develop_ref" "$develop_branch_name"; then
       abort "Local branch '$develop_branch_name' is behind or has diverged from 'origin/$develop_branch_name'."
     fi
   fi
 
   if git show-ref --verify --quiet "$local_master_ref" &&
-     git show-ref --verify --quiet "$remote_master_ref"; then
+     [[ -n "$remote_master_sha" ]]; then
     if [[ "$(git rev-parse "$local_master_ref")" != "$(git rev-parse "$remote_master_ref")" ]]; then
       abort "Local branch '$master_branch_name' does not match 'origin/$master_branch_name'."
     fi
@@ -410,7 +626,7 @@ preflight_release() {
 
   if git show-ref --verify --quiet "$local_master_ref"; then
     master_base_ref="$local_master_ref"
-  elif git show-ref --verify --quiet "$remote_master_ref"; then
+  elif [[ -n "$remote_master_sha" ]]; then
     master_base_ref="$remote_master_ref"
   fi
 
@@ -418,6 +634,9 @@ preflight_release() {
      ! git merge-base --is-ancestor "$master_base_ref" "$develop_branch_name"; then
     abort "Development branch '$develop_branch_name' does not contain the current '$master_branch_name' history."
   fi
+
+  release_initial_remote_develop_sha="${remote_develop_sha:-absent}"
+  release_initial_remote_master_sha="${remote_master_sha:-absent}"
 
   log "Release preflight checks passed."
 }

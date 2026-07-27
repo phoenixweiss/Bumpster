@@ -112,18 +112,15 @@ default_master_branch=${master_branch:-"$default_master_branch"}
 export default_dev_branch
 export default_master_branch
 
-# Ensure VERSION file exists and read the current version
+# Ensure VERSION contains a strict semantic version
 if [ -f "VERSION" ]; then
-  current_version=$(cat VERSION)
+  current_version=$(cat VERSION) || abort "Failed to read the VERSION file."
+  if [[ ! "$current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    abort "VERSION must contain MAJOR.MINOR.PATCH with no prefix, suffix, or leading zeros."
+  fi
   log "Current version is $current_version"
 else
-  current_version="0.0.0"
-  printf '%s' "$current_version" > VERSION
-  log "The VERSION file is created and filled with the value $current_version"
-  log "Initialization complete with version $current_version."
-  git add VERSION
-  git commit -m "Initialize versioning with $current_version"
-  log "Version file committed to repository."
+  abort "VERSION file not found. Create it with a semantic version such as 0.1.0 before releasing."
 fi
 
 # Prompt for version type if not provided
@@ -159,12 +156,23 @@ export BUMPSTER_PREV_VERSION="$current_version"
 export BUMPSTER_NEW_VERSION="$new_version"
 run_hook "pre-bump"
 
+# Preserve exact release state for diagnostics after the first local mutation
+release_diagnostics_active="true"
+release_published="false"
+release_stage="updating VERSION"
+release_tag_name="v$new_version"
+release_develop_branch="$default_dev_branch"
+release_master_branch="$default_master_branch"
+trap 'release_exit_handler "$?"' EXIT
+
 # Update the VERSION file and create a commit
-printf '%s' "$new_version" > VERSION
-git add VERSION
+printf '%s' "$new_version" > VERSION ||
+  abort "Failed to write version $new_version to VERSION."
+git add VERSION || abort "Failed to stage VERSION."
 
 # Synchronize version with package.json if enabled
 if [[ "${sync_with_package_json}" == "true" ]]; then
+  release_stage="synchronizing package.json"
   if [ -f "package.json" ]; then
     log "Synchronizing version with package.json."
     # Update version in package.json
@@ -174,9 +182,9 @@ if [[ "${sync_with_package_json}" == "true" ]]; then
       else
         echo "$line" >> package.tmp
       fi
-    done < package.json
-    mv package.tmp package.json
-    git add package.json
+    done < package.json || abort "Failed to prepare the package.json version update."
+    mv package.tmp package.json || abort "Failed to replace package.json."
+    git add package.json || abort "Failed to stage package.json."
     log "Updated version in package.json to ${new_version}."
   else
     log "package.json not found. Skipping synchronization."
@@ -184,7 +192,9 @@ if [[ "${sync_with_package_json}" == "true" ]]; then
 fi
 
 # Commit the changes
-git commit -m "bump version to $new_version" -m "Automatic version bump to $new_version"
+release_stage="creating the version commit"
+git commit -m "bump version to $new_version" -m "Automatic version bump to $new_version" ||
+  abort "Failed to create the version commit."
 log "Bumping version to $new_version"
 
 # Handle branch management manually
@@ -201,38 +211,47 @@ if ! git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
 fi
 
 # Switch to the after bump branch
+release_stage="switching to the after-bump branch"
 log "Switching to branch '$after_bump_branch'."
 git checkout "$after_bump_branch" || abort "Failed to switch to branch '$after_bump_branch'."
 
+release_stage="preparing the development branch"
 log "Ensuring branch '$default_dev_branch' exists before merging."
 check_or_create_branch "$default_dev_branch"
 log "Switching to branch '$default_dev_branch' for merging."
 
 # Merge current branch into dev
 if [[ "$current_branch" != "$default_dev_branch" && "$current_branch" != "$default_master_branch" ]]; then
+  release_stage="merging into the development branch"
   log "Merging current branch '$current_branch' into '$default_dev_branch'."
   git merge "$current_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
 fi
 
 # Create a release from dev to main
 
+release_stage="preparing the main branch"
 log "Ensuring branch '$default_master_branch' exists before releasing."
 check_or_create_branch "$default_master_branch"
 log "Switching to branch '$default_master_branch' for releasing."
 
+release_stage="merging the development branch into main"
 log "Creating a release from '$default_dev_branch' to '$default_master_branch'."
 git merge "$default_dev_branch" --no-edit || abort "Merge failed. Please resolve conflicts."
+release_stage="creating the release tag"
 git tag -a "v$new_version" -m "Release $new_version" ||
   abort "Failed to create release tag 'v$new_version'."
 
 # Publish both release branches and the tag as one remote transaction
+release_stage="atomic publication"
 log "Publishing '$default_dev_branch', '$default_master_branch', and tag 'v$new_version' atomically."
 git push --atomic origin \
   "$default_dev_branch" \
   "$default_master_branch" \
   "refs/tags/v$new_version" ||
-  abort "Failed to publish the release atomically. Remote release refs were not changed."
+  abort "Failed to publish the release atomically. Verify local and remote refs before recovery."
 
+release_published="true"
+release_stage="configuring branch upstreams"
 git branch --set-upstream-to="origin/$default_dev_branch" "$default_dev_branch" >/dev/null 2>&1 ||
   log "Could not configure upstream for '$default_dev_branch'." "WARN"
 git branch --set-upstream-to="origin/$default_master_branch" "$default_master_branch" >/dev/null 2>&1 ||
@@ -241,6 +260,7 @@ log "Release branches and tag published successfully."
 
 # Switch to after bump branch if specified
 if [[ -n "$after_bump_branch" ]]; then
+  release_stage="switching to the after-bump branch after publication"
   log "Switching to branch '$after_bump_branch' after bumping version."
   if git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
     git checkout "$after_bump_branch" || abort "Failed to switch to branch '$after_bump_branch'."
@@ -251,4 +271,8 @@ if [[ -n "$after_bump_branch" ]]; then
 fi
 
 # Run post-bump hook if available
+release_stage="post-bump hook"
 run_hook "post-bump"
+
+release_diagnostics_active="false"
+trap - EXIT

@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Release failure diagnostics that preserve local state, compare current remote
+  refs with their preflight values, and print safe inspection or retry commands
+  without performing an automatic rollback.
+
+### Changed
+
+- Release preflight now requires an existing stable `MAJOR.MINOR.PATCH` value in
+  `VERSION`, a configured and reachable `origin`, matching upstreams for local
+  release branches, and fetched tracking refs for remote release branches.
+- Failed atomic publication no longer assumes that remote refs are unchanged;
+  Bumpster verifies them before suggesting a retry.
+
 ## [0.8.3] - 2026-07-27
 
 ### Added

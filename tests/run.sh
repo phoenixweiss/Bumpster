@@ -335,6 +335,138 @@ test_wrong_starting_branch_is_rejected() {
   assert_release_state_unchanged "$initial_head" "0.8.0"
 }
 
+test_missing_version_file_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "missing-version" || return 1
+  git -C "$fixture_worktree" rm -q VERSION || return 1
+  git -C "$fixture_worktree" commit -q -m "Remove fixture version" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded without VERSION" || return 1
+  assert_contains "$cli_output" "VERSION file not found." \
+    "Missing VERSION error is unclear" || return 1
+  assert_equal "$initial_head" "$(git -C "$fixture_worktree" rev-parse HEAD)" \
+    "HEAD changed after missing VERSION was rejected"
+}
+
+test_invalid_version_is_rejected_without_mutation() {
+  local invalid_version
+  local initial_head
+
+  for invalid_version in "1.2" "1.2.3.4" "01.2.3" "v1.2.3" "1.2.x" "1.2.3-rc.1"; do
+    create_fixture "invalid-version-${invalid_version//[^a-zA-Z0-9]/-}" "$invalid_version" ||
+      return 1
+    initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+    run_bumpster --patch
+
+    [[ "$cli_status" -ne 0 ]] ||
+      fail "Release unexpectedly accepted VERSION '$invalid_version'" || return 1
+    assert_contains "$cli_output" "VERSION must contain MAJOR.MINOR.PATCH" \
+      "Invalid VERSION error is unclear for '$invalid_version'" || return 1
+    assert_release_state_unchanged "$initial_head" "$invalid_version" || return 1
+  done
+}
+
+test_missing_origin_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "missing-origin" || return 1
+  git -C "$fixture_worktree" remote remove origin || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded without origin" || return 1
+  assert_contains "$cli_output" "Remote 'origin' is not configured." \
+    "Missing origin error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_unreachable_origin_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "unreachable-origin" || return 1
+  git -C "$fixture_worktree" remote set-url origin "$fixture_root/unreachable.git" ||
+    return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded with unreachable origin" || return 1
+  assert_contains "$cli_output" "Failed to query release refs from origin." \
+    "Unreachable origin error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_missing_development_upstream_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "missing-dev-upstream" || return 1
+  git -C "$fixture_worktree" branch --unset-upstream dev || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded without dev upstream" || return 1
+  assert_contains "$cli_output" "Branch 'dev' must track 'origin/dev' before release." \
+    "Missing dev upstream error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_wrong_development_upstream_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "wrong-dev-upstream" || return 1
+  git -C "$fixture_worktree" branch --set-upstream-to=origin/main dev >/dev/null ||
+    return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded with wrong dev upstream" || return 1
+  assert_contains "$cli_output" "Branch 'dev' tracks 'origin/main'; expected 'origin/dev'." \
+    "Wrong dev upstream error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_wrong_main_upstream_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "wrong-main-upstream" || return 1
+  git -C "$fixture_worktree" branch --set-upstream-to=origin/dev main >/dev/null ||
+    return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded with wrong main upstream" || return 1
+  assert_contains "$cli_output" "Branch 'main' tracks 'origin/dev'; expected 'origin/main'." \
+    "Wrong main upstream error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_unfetched_remote_development_is_rejected_without_mutation() {
+  local initial_head
+
+  create_fixture "unfetched-remote-dev" || return 1
+  git -C "$fixture_worktree" config --unset-all remote.origin.fetch || return 1
+  git -C "$fixture_worktree" config --add remote.origin.fetch \
+    "+refs/heads/main:refs/remotes/origin/main" || return 1
+  git -C "$fixture_worktree" update-ref -d refs/remotes/origin/dev || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded without fetched origin/dev" || return 1
+  assert_contains "$cli_output" "Remote branch 'origin/dev' exists but was not fetched." \
+    "Fetch refspec error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
 test_failing_pre_hook_is_rejected_without_mutation() {
   local initial_head
   local hook_path
@@ -509,6 +641,13 @@ test_rejected_main_push_keeps_remote_release_atomic() {
   [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded after main push was rejected" || return 1
   assert_contains "$cli_output" "Failed to publish the release atomically" \
     "Atomic push failure is missing" || return 1
+  assert_contains "$cli_output" "No automatic rollback was attempted" \
+    "Preserved local state is not explained" || return 1
+  assert_contains "$cli_output" "Remote release refs are unchanged from preflight." \
+    "Remote recovery state is not verified" || return 1
+  assert_contains "$cli_output" \
+    "git push --atomic origin refs/heads/dev refs/heads/main refs/tags/v0.8.1" \
+    "Safe atomic retry command is missing" || return 1
 
   actual_remote_dev="$(git --git-dir="$fixture_origin" rev-parse refs/heads/dev)" || return 1
   actual_remote_main="$(git --git-dir="$fixture_origin" rev-parse refs/heads/main)" || return 1
@@ -518,6 +657,31 @@ test_rejected_main_push_keeps_remote_release_atomic() {
   if git --git-dir="$fixture_origin" show-ref --verify --quiet refs/tags/v0.8.1; then
     fail "Remote tag was created after rejected atomic push"
   fi
+}
+
+test_failing_post_hook_reports_published_release() {
+  local hook_path
+  local remote_tag_commit
+
+  create_fixture "failing-post-hook" || return 1
+  hook_path="$fixture_worktree/.bumpster/hooks/post-bump"
+  mkdir -p "$(dirname "$hook_path")" || return 1
+  printf '/.bumpster/\n' >> "$fixture_worktree/.git/info/exclude" || return 1
+  printf '#!/usr/bin/env bash\nexit 42\n' > "$hook_path" || return 1
+  chmod +x "$hook_path" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] || fail "Failing post-hook unexpectedly returned success" || return 1
+  assert_contains "$cli_output" "The release was published before this later step failed." \
+    "Published release state is not explained" || return 1
+  assert_not_contains "$cli_output" "the preserved release can be retried" \
+    "Published release incorrectly suggests another push" || return 1
+  remote_tag_commit="$(
+    git --git-dir="$fixture_origin" rev-list -n 1 refs/tags/v0.8.1
+  )" || return 1
+  assert_equal "$(git -C "$fixture_worktree" rev-parse dev)" "$remote_tag_commit" \
+    "Published release tag points to the wrong commit"
 }
 
 run_test() {
@@ -547,6 +711,14 @@ main() {
   run_test "major release resets minor and patch and publishes the release" test_major_release_flow
   run_test "dirty worktree is rejected without release mutations" test_dirty_worktree_is_rejected
   run_test "wrong starting branch is rejected without release mutations" test_wrong_starting_branch_is_rejected
+  run_test "missing VERSION is rejected without release mutations" test_missing_version_file_is_rejected_without_mutation
+  run_test "invalid semantic versions are rejected without release mutations" test_invalid_version_is_rejected_without_mutation
+  run_test "missing origin is rejected without release mutations" test_missing_origin_is_rejected_without_mutation
+  run_test "unreachable origin is rejected without release mutations" test_unreachable_origin_is_rejected_without_mutation
+  run_test "missing development upstream is rejected without release mutations" test_missing_development_upstream_is_rejected_without_mutation
+  run_test "wrong development upstream is rejected without release mutations" test_wrong_development_upstream_is_rejected_without_mutation
+  run_test "wrong main upstream is rejected without release mutations" test_wrong_main_upstream_is_rejected_without_mutation
+  run_test "unfetched remote development is rejected without release mutations" test_unfetched_remote_development_is_rejected_without_mutation
   run_test "failing pre-hook is rejected without release mutations" test_failing_pre_hook_is_rejected_without_mutation
   run_test "existing release tag is rejected without release mutations" test_existing_release_tag_is_rejected_without_mutation
   run_test "remote development ahead is rejected without release mutations" test_remote_development_ahead_is_rejected_without_mutation
@@ -559,6 +731,7 @@ main() {
   run_test "missing remote development is created by the release" test_missing_remote_development_is_created_by_release
   run_test "remote-only release tag is rejected without release mutations" test_remote_only_release_tag_is_rejected_without_mutation
   run_test "rejected main update leaves all remote release refs unchanged" test_rejected_main_push_keeps_remote_release_atomic
+  run_test "failing post-hook reports the already published release" test_failing_post_hook_reports_published_release
 
   printf '\nPassed: %d\nFailed: %d\n' "$passed" "$failed"
   [[ "$failed" -eq 0 ]]

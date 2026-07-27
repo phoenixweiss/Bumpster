@@ -61,13 +61,26 @@ source ~/.bash_profile
 Before running any command:
 
 - Ensure you are inside an initialized Git repository (`git rev-parse --git-dir` should print the `.git` path and exit without errors).
+- Ensure `VERSION` exists and contains a stable semantic version in the exact
+  `MAJOR.MINOR.PATCH` format, without a `v` prefix, prerelease suffix, or leading
+  zeros.
 - Make sure your working tree is clean. `bumpster.sh` refuses to run if there are unstaged or uncommitted changes to prevent accidental data loss.
 - Double-check that the active branch matches your configured `BEFORE_BUMP_BRANCH` (defaults to `dev`); Bumpster aborts otherwise to keep releases consistent.
-- Ensure `origin` is reachable. Before changing files, Bumpster fetches its current refs, rejects a local development branch that is behind or diverged, and verifies that local `main` matches `origin/main`.
+- Make sure `origin` is configured and reachable. Each local release branch must
+  track its matching branch on that remote, such as `dev` tracking `origin/dev`
+  and `main` tracking `origin/main`.
+- Before changing files, Bumpster fetches the current `origin` refs, rejects a
+  local development branch that is behind or diverged, and verifies that local
+  `main` matches `origin/main`.
 - Make sure the target release tag does not already exist locally or on `origin`.
 
 The development branch, main branch, and release tag are published with one
 atomic push. If the remote rejects any of these refs, none of them are updated.
+If a release stops after creating local state, Bumpster does not roll it back
+automatically. It reports the current branch, commit, worktree and tag state,
+compares the remote refs with their preflight values, and prints safe inspection
+commands. A retry command is shown only when a rejected atomic publication left
+the remote refs unchanged.
 
 ### Bumping Versions
 
