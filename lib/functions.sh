@@ -703,46 +703,138 @@ create_feature() {
   log "Feature branch '$feature_branch_name' created and checked out."
 }
 
+# Function to abort feature closing while preserving an exact operation-owned stash
+abort_close_feature() {
+  local message="$1"
+  local stash_oid="${2:-}"
+  local feature_branch_name="${3:-}"
+
+  if [[ -n "$stash_oid" ]]; then
+    log "Uncommitted changes from '$feature_branch_name' remain preserved in stash commit '$stash_oid'." "ERROR"
+    log "Inspect 'git stash list' and the current branch state before restoring them manually." "ERROR"
+  fi
+  abort "$message"
+}
+
+# Function to find the reflog selector for one exact stash commit
+find_stash_ref_by_oid() {
+  local stash_oid="$1"
+
+  git stash list --format='%H %gd' |
+    awk -v expected_oid="$stash_oid" '$1 == expected_oid { print $2; exit }'
+}
+
+# Function to restore and remove only the stash created by close_feature
+restore_close_feature_stash() {
+  local stash_oid="$1"
+  local target_branch="$2"
+  local feature_branch_name="$3"
+  local current_branch=""
+  local stash_ref=""
+
+  current_branch="$(git rev-parse --abbrev-ref HEAD)" ||
+    abort_close_feature "Could not determine the branch used for stash restoration." \
+      "$stash_oid" "$feature_branch_name"
+  if [[ "$current_branch" != "$target_branch" ]]; then
+    abort_close_feature \
+      "Refusing to restore feature changes on '$current_branch'; expected '$target_branch'." \
+      "$stash_oid" "$feature_branch_name"
+  fi
+
+  log "Restoring stashed feature changes on '$target_branch'."
+  git stash apply --index "$stash_oid" ||
+    abort_close_feature \
+      "Failed to restore stashed changes on '$target_branch'. Resolve the working tree before retrying." \
+      "$stash_oid" "$feature_branch_name"
+
+  stash_ref="$(find_stash_ref_by_oid "$stash_oid")"
+  if [[ -z "$stash_ref" ]]; then
+    log "Restored changes, but the operation-owned stash entry could not be found for cleanup." "WARN"
+    return
+  fi
+  git stash drop "$stash_ref" >/dev/null ||
+    log "Restored changes, but failed to drop operation-owned stash '$stash_ref'." "WARN"
+}
+
 # Function to close the current feature branch
 close_feature() {
   # Use the configured develop and master branches, falling back to defaults
   local dev_branch="${develop_branch:-$default_develop_branch}"
   local master_branch_name="${master_branch:-$default_master_branch}"
+  local current_branch=""
+  local stash_response=""
+  local delete_response=""
+  local stash_before=""
+  local created_stash_oid=""
 
-  # Check for uncommitted changes
-  local current_branch
-  current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-  if [[ -n $(git status --porcelain) ]]; then
-    log "You have uncommitted changes in your working directory."
-    read -r -p "Do you want to stash these changes before proceeding? (y/n): " stash_response
-    if [[ "$stash_response" =~ ^(y|Y|yes|Yes)$ ]]; then
-      git stash push -m "Auto-stash before closing feature branch" || abort "Failed to stash changes."
-      log "Uncommitted changes stashed successfully."
-    else
-      log "Proceeding with uncommitted changes."
-    fi
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    abort "Git repository not found. Please initialize git first."
   fi
+  current_branch="$(git rev-parse --abbrev-ref HEAD)" ||
+    abort "Could not determine the current branch."
 
-  # Ensure the current branch is a feature branch
+  # Ensure the current branch is a feature branch before changing stash state
   if [[ "$current_branch" == "$dev_branch" || "$current_branch" == "$master_branch_name" ]]; then
     abort "Cannot close a feature branch from '$current_branch'. Please switch to a feature branch."
   fi
-
-  if [[ "$(git rev-parse --abbrev-ref HEAD)" != "$current_branch" ]]; then
-    abort "Current branch mismatch. Expected '$current_branch'."
+  if [[ "$current_branch" == "HEAD" ]]; then
+    abort "Cannot close a feature branch from detached HEAD."
+  fi
+  if ! git show-ref --verify --quiet "refs/heads/$dev_branch"; then
+    abort "Development branch '$dev_branch' does not exist locally."
   fi
 
+  # Require an operation-owned stash before checkout or merge
+  if [[ -n $(git status --porcelain) ]]; then
+    log "You have uncommitted changes in your working directory."
+    read -r -p \
+      "Stash them and restore them on '$dev_branch' after the merge? (y/n): " \
+      stash_response
+    if [[ "$stash_response" =~ ^(y|Y|yes|Yes)$ ]]; then
+      stash_before="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
+      git stash push --include-untracked -m "Bumpster close-feature: $current_branch" ||
+        abort "Failed to stash feature changes."
+      created_stash_oid="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
+      if [[ -z "$created_stash_oid" || "$created_stash_oid" == "$stash_before" ]]; then
+        abort "Git did not create a new stash for the feature changes."
+      fi
+      if [[ -n $(git status --porcelain) ]]; then
+        abort_close_feature \
+          "Some working tree changes could not be stashed. Feature closing was not started." \
+          "$created_stash_oid" "$current_branch"
+      fi
+      log "Feature changes stashed as '$created_stash_oid'."
+    else
+      abort "Feature closing requires a clean working tree. Commit or stash the changes and retry."
+    fi
+  fi
+
+  if [[ "$(git rev-parse --abbrev-ref HEAD)" != "$current_branch" ]]; then
+    abort_close_feature "Current branch mismatch. Expected '$current_branch'." \
+      "$created_stash_oid" "$current_branch"
+  fi
 
   # Switch to the development branch
   log "Switching to development branch '$dev_branch'."
-  git checkout "$dev_branch" || abort "Failed to switch to branch '$dev_branch'."
+  git checkout "$dev_branch" ||
+    abort_close_feature "Failed to switch to branch '$dev_branch'." \
+      "$created_stash_oid" "$current_branch"
 
   # Merge the feature branch into the development branch
   log "Merging feature branch '$current_branch' into '$dev_branch'."
-  git merge "$current_branch" --no-edit || abort "Merge failed. Please resolve conflicts manually."
+  git merge "$current_branch" --no-edit ||
+    abort_close_feature "Merge failed. Please resolve conflicts manually." \
+      "$created_stash_oid" "$current_branch"
 
-  git push origin "$dev_branch" || abort "Failed to push changes to remote."
+  git push origin "$dev_branch" ||
+    abort_close_feature "Failed to push changes to remote." \
+      "$created_stash_oid" "$current_branch"
+
+  # Restore only the stash created by this invocation, always on the development branch
+  if [[ -n "$created_stash_oid" ]]; then
+    restore_close_feature_stash "$created_stash_oid" "$dev_branch" "$current_branch"
+    created_stash_oid=""
+  fi
 
   # Handle branch deletion based on configuration
   if [[ "$delete_feature_branch_after_merge" == "true" || "$ask_before_deleting_feature_branch" == "true" ]]; then
@@ -780,21 +872,6 @@ close_feature() {
     fi
   else
     log "Feature branch '$current_branch' retained."
-  fi
-
-  # Apply stashed changes back if needed
-  if git stash list | grep -q "Auto-stash before closing feature branch"; then
-    log "Checking for stashed changes to apply..."
-    if [[ -z $(git diff HEAD 'stash@{0}') ]]; then
-      log "No changes from stash need to be applied."
-      git stash drop 'stash@{0}' || log "Failed to drop stash. You can manually clean it up." "WARN"
-    else
-      log "Applying stashed changes back."
-      git stash apply || log "Failed to apply stashed changes. You can manually recover them with 'git stash list'." "WARN"
-      log "Stashed changes successfully applied back to the working directory."
-    fi
-  else
-    log "No stashed changes to apply."
   fi
 
   # Reminder about uncommitted changes

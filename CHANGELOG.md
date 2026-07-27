@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Closing a feature branch with uncommitted changes now requires an explicit
+  operation-owned stash, including untracked files. Declining the stash aborts
+  before any checkout or merge.
+- After a successful merge and push, the operation-owned stash is restored with
+  its staged state on the configured development branch.
+
+### Fixed
+
+- Existing user stashes are never selected by message or position when closing
+  a feature branch. Bumpster tracks its exact stash commit, removes only that
+  entry after a successful restore, and reports its ID if a later step fails.
+
 ## [0.8.4] - 2026-07-27
 
 ### Added

@@ -241,6 +241,12 @@ bump -c
 ```
 
 When closing a feature branch, changes are merged into the development branch, and the feature branch is optionally deleted based on configuration.
+If the working tree contains uncommitted changes, Bumpster offers to stash both
+tracked and untracked files. Declining aborts before checkout or merge. After a
+successful merge and push, only the stash created by that invocation is restored
+with its staged state on the configured development branch; existing stashes
+remain untouched. If a later operation fails, Bumpster preserves the created
+stash and reports its exact commit ID for manual recovery.
 
 ### Custom Hooks
 

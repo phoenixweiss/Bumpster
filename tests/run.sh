@@ -144,6 +144,30 @@ run_bumpster() {
   cli_status=$?
 }
 
+run_bumpster_with_input() {
+  local input="$1"
+  shift
+
+  cli_output="$(
+    cd "$fixture_worktree" &&
+      HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      bash "$project_root/bumpster.sh" "$@" <<< "$input" 2>&1
+  )"
+  cli_status=$?
+}
+
+create_feature_fixture() {
+  local name="$1"
+
+  create_fixture "$name" || return 1
+  git -C "$fixture_worktree" checkout -q -b feature/example || return 1
+  printf 'Committed feature change\n' > "$fixture_worktree/feature.txt" || return 1
+  git -C "$fixture_worktree" add feature.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add fixture feature" || return 1
+  git -C "$fixture_worktree" push -q -u origin feature/example
+}
+
 assert_release_state_unchanged() {
   local expected_head="$1"
   local expected_version="$2"
@@ -231,6 +255,177 @@ test_fixture_uses_local_bare_remote() {
 
   assert_fixture_is_isolated ||
     fail "Fixture origin is not an isolated local bare repository"
+}
+
+test_clean_feature_branch_is_closed() {
+  local current_branch
+  local remote_feature_content
+
+  create_feature_fixture "close-clean-feature" || return 1
+
+  run_bumpster_with_input "n" --close-feature
+
+  assert_equal "0" "$cli_status" "Clean feature close failed: $cli_output" || return 1
+  current_branch="$(git -C "$fixture_worktree" branch --show-current)" || return 1
+  remote_feature_content="$(
+    git --git-dir="$fixture_origin" show refs/heads/dev:feature.txt
+  )" || return 1
+  assert_equal "dev" "$current_branch" "Feature close did not finish on dev" || return 1
+  assert_equal "Committed feature change" "$remote_feature_content" \
+    "Committed feature change was not pushed to dev" || return 1
+  assert_command_succeeds "Retained feature branch is missing" \
+    git -C "$fixture_worktree" show-ref --verify --quiet refs/heads/feature/example
+}
+
+test_dirty_feature_decline_is_rejected_without_mutation() {
+  local initial_branch
+  local initial_dev
+  local initial_status
+
+  create_feature_fixture "close-dirty-decline" || return 1
+  printf 'Uncommitted feature change\n' >> "$fixture_worktree/README.md" || return 1
+  initial_branch="$(git -C "$fixture_worktree" branch --show-current)" || return 1
+  initial_dev="$(git -C "$fixture_worktree" rev-parse dev)" || return 1
+  initial_status="$(git -C "$fixture_worktree" status --porcelain)" || return 1
+
+  run_bumpster_with_input "n" --close-feature
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Dirty feature close unexpectedly continued without a stash" || return 1
+  assert_contains "$cli_output" "Feature closing requires a clean working tree." \
+    "Dirty feature rejection is unclear" || return 1
+  assert_equal "$initial_branch" "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Branch changed after declining stash" || return 1
+  assert_equal "$initial_dev" "$(git -C "$fixture_worktree" rev-parse dev)" \
+    "Development branch changed after declining stash" || return 1
+  assert_equal "$initial_status" "$(git -C "$fixture_worktree" status --porcelain)" \
+    "Working tree changed after declining stash"
+}
+
+test_existing_stash_is_untouched_by_clean_feature_close() {
+  local existing_stash_oid
+  local remaining_stashes
+
+  create_feature_fixture "close-keeps-existing-stash" || return 1
+  printf 'Existing stashed change\n' >> "$fixture_worktree/README.md" || return 1
+  git -C "$fixture_worktree" stash push -q \
+    -m "Auto-stash before closing feature branch" || return 1
+  existing_stash_oid="$(
+    git -C "$fixture_worktree" rev-parse refs/stash
+  )" || return 1
+
+  run_bumpster_with_input "n" --close-feature
+
+  assert_equal "0" "$cli_status" "Clean feature close failed: $cli_output" || return 1
+  remaining_stashes="$(
+    git -C "$fixture_worktree" stash list --format='%H'
+  )" || return 1
+  assert_equal "$existing_stash_oid" "$remaining_stashes" \
+    "Existing stash was changed by a clean feature close" || return 1
+  assert_equal "" "$(git -C "$fixture_worktree" status --porcelain)" \
+    "Existing stash was unexpectedly applied"
+}
+
+test_operation_stash_is_restored_without_touching_older_stash() {
+  local existing_stash_oid
+  local remaining_stashes
+  local remote_readme
+
+  create_feature_fixture "close-restores-owned-stash" || return 1
+  printf 'Older stashed change\n' >> "$fixture_worktree/README.md" || return 1
+  git -C "$fixture_worktree" stash push -q -m "Older user stash" || return 1
+  existing_stash_oid="$(
+    git -C "$fixture_worktree" rev-parse refs/stash
+  )" || return 1
+
+  printf '# Staged feature draft\n' > "$fixture_worktree/README.md" || return 1
+  git -C "$fixture_worktree" add README.md || return 1
+  printf 'Untracked feature draft\n' > "$fixture_worktree/draft.txt" || return 1
+
+  run_bumpster_with_input $'y\nn' --close-feature
+
+  assert_equal "0" "$cli_status" "Stashed feature close failed: $cli_output" || return 1
+  assert_equal "dev" "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Stashed changes were not restored on dev" || return 1
+  assert_equal "# Staged feature draft" "$(<"$fixture_worktree/README.md")" \
+    "Tracked feature draft was not restored" || return 1
+  assert_equal "Untracked feature draft" "$(<"$fixture_worktree/draft.txt")" \
+    "Untracked feature draft was not restored" || return 1
+  assert_contains "$(git -C "$fixture_worktree" diff --cached --name-only)" "README.md" \
+    "Staged state was not restored" || return 1
+  remaining_stashes="$(
+    git -C "$fixture_worktree" stash list --format='%H'
+  )" || return 1
+  assert_equal "$existing_stash_oid" "$remaining_stashes" \
+    "Operation-owned stash was not removed exactly" || return 1
+  remote_readme="$(
+    git --git-dir="$fixture_origin" show refs/heads/dev:README.md
+  )" || return 1
+  assert_equal "# Fixture repository" "$remote_readme" \
+    "Uncommitted feature draft leaked into remote dev"
+}
+
+test_close_from_development_branch_does_not_create_stash() {
+  local initial_status
+
+  create_fixture "close-from-dev" || return 1
+  printf 'Uncommitted development change\n' >> "$fixture_worktree/README.md" || return 1
+  initial_status="$(git -C "$fixture_worktree" status --porcelain)" || return 1
+
+  run_bumpster --close-feature
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Feature close unexpectedly continued from dev" || return 1
+  assert_contains "$cli_output" "Cannot close a feature branch from 'dev'." \
+    "Development branch rejection is unclear" || return 1
+  assert_equal "$initial_status" "$(git -C "$fixture_worktree" status --porcelain)" \
+    "Working tree changed after close was rejected on dev" || return 1
+  assert_equal "" "$(git -C "$fixture_worktree" stash list)" \
+    "A stash was created before validating the current branch"
+}
+
+test_failed_feature_push_preserves_operation_stash() {
+  local existing_stash_oid
+  local created_stash_oid
+  local remaining_stashes
+  local initial_remote_dev
+
+  create_feature_fixture "close-push-failure" || return 1
+  printf 'Older stashed change\n' >> "$fixture_worktree/README.md" || return 1
+  git -C "$fixture_worktree" stash push -q -m "Older user stash" || return 1
+  existing_stash_oid="$(
+    git -C "$fixture_worktree" rev-parse refs/stash
+  )" || return 1
+  printf 'Uncommitted feature change\n' >> "$fixture_worktree/README.md" || return 1
+  printf 'Untracked feature change\n' > "$fixture_worktree/draft.txt" || return 1
+  initial_remote_dev="$(git --git-dir="$fixture_origin" rev-parse refs/heads/dev)" ||
+    return 1
+  git -C "$fixture_worktree" remote set-url --push origin \
+    "$fixture_root/unreachable.git" || return 1
+
+  run_bumpster_with_input "y" --close-feature
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Feature close unexpectedly succeeded with an unreachable push URL" || return 1
+  assert_contains "$cli_output" "Failed to push changes to remote." \
+    "Feature push failure is unclear" || return 1
+  assert_contains "$cli_output" "remain preserved in stash commit" \
+    "Preserved operation stash is not reported" || return 1
+  created_stash_oid="$(git -C "$fixture_worktree" rev-parse refs/stash)" || return 1
+  assert_contains "$cli_output" "$created_stash_oid" \
+    "Feature failure does not identify the exact operation stash" || return 1
+  remaining_stashes="$(
+    git -C "$fixture_worktree" stash list --format='%H'
+  )" || return 1
+  assert_contains "$remaining_stashes" "$created_stash_oid" \
+    "Operation stash was lost after push failure" || return 1
+  assert_contains "$remaining_stashes" "$existing_stash_oid" \
+    "Older stash was lost after push failure" || return 1
+  assert_equal "" "$(git -C "$fixture_worktree" status --porcelain)" \
+    "Stashed changes leaked back into the failed close worktree" || return 1
+  assert_equal "$initial_remote_dev" \
+    "$(git --git-dir="$fixture_origin" rev-parse refs/heads/dev)" \
+    "Remote dev changed despite the failed push"
 }
 
 test_release_notes_extract_version_section() {
@@ -703,6 +898,12 @@ main() {
     fail "Could not create the test directory" || return 1
 
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
+  run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
+  run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
+  run_test "clean feature close leaves existing stash untouched" test_existing_stash_is_untouched_by_clean_feature_close
+  run_test "operation stash restores tracked and untracked changes only" test_operation_stash_is_restored_without_touching_older_stash
+  run_test "close from development branch does not create a stash" test_close_from_development_branch_does_not_create_stash
+  run_test "failed feature push preserves the exact operation stash" test_failed_feature_push_preserves_operation_stash
   run_test "release notes extract only the requested CHANGELOG section" test_release_notes_extract_version_section
   run_test "release notes reject a version missing from CHANGELOG" test_release_notes_reject_missing_version
   run_test "release metadata matches VERSION, tag, commit and origin/main" test_release_metadata_matches_published_refs
