@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- A reproducible runtime packager that builds a versioned archive from an
+  explicit Git-ref whitelist and emits `SHA256SUMS`.
+- An acceptance test proving repeated builds are byte-identical, the packaged
+  CLI is executable, and no documentation, tests, CI, installer, or development
+  files enter the runtime archive.
+
 ## [0.8.5] - 2026-07-27
 
 ### Changed

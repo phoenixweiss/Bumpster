@@ -344,6 +344,19 @@ Run the integration suite separately:
 ./tests/run.sh
 ```
 
+Build the versioned runtime archive and `SHA256SUMS` from a committed Git ref
+with:
+
+```bash
+./scripts/build-runtime.sh /tmp/bumpster-dist HEAD
+```
+
+The archive is generated from an explicit whitelist and contains only
+`bumpster.sh`, `config.sh`, `VERSION`, `LICENSE`, and the required `lib/` files.
+It excludes the installer, documentation, tests, CI configuration, development
+files, and any future website sources. Repeated builds of the same ref produce
+the same archive bytes.
+
 Release notes are maintained in the canonical English `CHANGELOG.md`. Preview
 the notes that would be published for a version with:
 

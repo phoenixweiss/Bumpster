@@ -265,6 +265,63 @@ test_fixture_uses_local_bare_remote() {
     fail "Fixture origin is not an isolated local bare repository"
 }
 
+test_runtime_archive_is_reproducible_and_minimal() {
+  local version
+  local output_one="$suite_root/runtime-one"
+  local output_two="$suite_root/runtime-two"
+  local archive_name
+  local archive_one
+  local archive_two
+  local expected_entries
+  local actual_entries
+  local extract_dir="$suite_root/runtime-extract"
+  local runtime_root
+  local version_output
+
+  version="$(git -C "$project_root" show HEAD:VERSION)" || return 1
+  archive_name="bumpster-$version.tar.gz"
+  archive_one="$output_one/$archive_name"
+  archive_two="$output_two/$archive_name"
+
+  "$project_root/scripts/build-runtime.sh" "$output_one" HEAD >/dev/null ||
+    return 1
+  "$project_root/scripts/build-runtime.sh" "$output_two" HEAD >/dev/null ||
+    return 1
+
+  assert_command_succeeds "Repeated runtime builds are not byte-for-byte reproducible" \
+    cmp -s "$archive_one" "$archive_two" || return 1
+  (
+    cd "$output_one" &&
+      shasum -a 256 -c SHA256SUMS >/dev/null
+  ) || fail "Runtime checksum verification failed" || return 1
+
+  expected_entries="$(
+    printf '%s\n' \
+      "bumpster-$version/" \
+      "bumpster-$version/LICENSE" \
+      "bumpster-$version/VERSION" \
+      "bumpster-$version/bumpster.sh" \
+      "bumpster-$version/config.sh" \
+      "bumpster-$version/lib/" \
+      "bumpster-$version/lib/BUMPSTER_LOGO.ASCII" \
+      "bumpster-$version/lib/functions.sh"
+  )"
+  actual_entries="$(tar -tzf "$archive_one" | LC_ALL=C sort)" || return 1
+  assert_equal "$expected_entries" "$actual_entries" \
+    "Runtime archive contains missing or unexpected paths" || return 1
+
+  mkdir -p "$extract_dir" || return 1
+  tar -xzf "$archive_one" -C "$extract_dir" || return 1
+  runtime_root="$extract_dir/bumpster-$version"
+  version_output="$(
+    HOME="$fixture_home" \
+      BUMPSTER_HOME="$runtime_root" \
+      bash "$runtime_root/bumpster.sh" --version
+  )" || return 1
+  assert_equal "Bumpster version: $version" "$version_output" \
+    "Packaged runtime cannot report its version"
+}
+
 test_clean_feature_branch_is_closed() {
   local current_branch
   local remote_feature_content
@@ -1040,6 +1097,7 @@ main() {
     fail "Could not create the test directory" || return 1
 
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
+  run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
   run_test "clean feature close leaves existing stash untouched" test_existing_stash_is_untouched_by_clean_feature_close
