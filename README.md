@@ -348,7 +348,7 @@ Release notes are maintained in the canonical English `CHANGELOG.md`. Preview
 the notes that would be published for a version with:
 
 ```bash
-./scripts/release-notes.sh 0.8.4
+./scripts/release-notes.sh 0.8.5
 ```
 
 Each scenario creates a temporary working repository, an isolated `HOME`, and a

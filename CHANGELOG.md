@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-07-27
+
 ### Changed
 
 - Closing a feature branch with uncommitted changes now requires an explicit
@@ -141,7 +143,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.1...v0.8.2
