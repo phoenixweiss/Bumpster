@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-07-27
+
 ### Added
 
 - Release failure diagnostics that preserve local state, compare current remote
@@ -119,7 +121,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.4...HEAD
+[0.8.4]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.0...v0.8.1
