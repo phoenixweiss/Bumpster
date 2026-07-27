@@ -10,6 +10,7 @@ fixture_origin=""
 fixture_home=""
 cli_output=""
 cli_status=0
+test_path="$PATH"
 passed=0
 failed=0
 
@@ -139,6 +140,7 @@ run_bumpster() {
     cd "$fixture_worktree" &&
       HOME="$fixture_home" \
       BUMPSTER_HOME="$project_root" \
+      PATH="$test_path" \
       bash "$project_root/bumpster.sh" "$@" 2>&1
   )"
   cli_status=$?
@@ -152,6 +154,7 @@ run_bumpster_with_input() {
     cd "$fixture_worktree" &&
       HOME="$fixture_home" \
       BUMPSTER_HOME="$project_root" \
+      PATH="$test_path" \
       bash "$project_root/bumpster.sh" "$@" <<< "$input" 2>&1
   )"
   cli_status=$?
@@ -166,6 +169,11 @@ create_feature_fixture() {
   git -C "$fixture_worktree" add feature.txt || return 1
   git -C "$fixture_worktree" commit -q -m "Add fixture feature" || return 1
   git -C "$fixture_worktree" push -q -u origin feature/example
+}
+
+enable_package_sync() {
+  printf '\nSYNC_WITH_PACKAGE_JSON="true"\n' >> "$fixture_worktree/.bumpsterrc" ||
+    return 1
 }
 
 assert_release_state_unchanged() {
@@ -446,6 +454,130 @@ test_release_notes_reject_missing_version() {
   [[ "$cli_status" -ne 0 ]] || fail "Missing CHANGELOG version unexpectedly succeeded" || return 1
   assert_contains "$cli_output" "No CHANGELOG section found for version 9.9.9." \
     "Missing CHANGELOG version error is unclear"
+}
+
+test_package_sync_updates_only_root_version_atomically() {
+  local package_values
+  local initial_mode
+  local updated_mode
+  local temporary_files
+
+  create_fixture "package-root-version" || return 1
+  enable_package_sync || return 1
+  {
+    printf '{\n'
+    printf '  "name": "fixture-package",\n'
+    printf '  "version": "0.8.0",\n'
+    printf '  "metadata": {\n'
+    printf '    "version": "9.9.9"\n'
+    printf '  },\n'
+    printf '  "versionLabel": "keep-me"\n'
+    printf '}\n'
+  } > "$fixture_worktree/package.json" || return 1
+  initial_mode="$(
+    node -e 'console.log(require("fs").statSync(process.argv[1]).mode & 0o777)' \
+      "$fixture_worktree/package.json"
+  )" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc package.json || return 1
+  git -C "$fixture_worktree" commit -q -m "Add fixture package" || return 1
+
+  run_bumpster --patch
+
+  assert_successful_release "0.8.1" || return 1
+  package_values="$(
+    node -e '
+      const data = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+      console.log([data.version, data.metadata.version, data.versionLabel].join("|"));
+    ' "$fixture_worktree/package.json"
+  )" || return 1
+  assert_equal "0.8.1|9.9.9|keep-me" "$package_values" \
+    "Package sync changed a non-root version value" || return 1
+  updated_mode="$(
+    node -e 'console.log(require("fs").statSync(process.argv[1]).mode & 0o777)' \
+      "$fixture_worktree/package.json"
+  )" || return 1
+  assert_equal "$initial_mode" "$updated_mode" \
+    "Atomic package replacement changed file permissions" || return 1
+  temporary_files="$(
+    find "$fixture_worktree" -maxdepth 1 -name '.package.json.bumpster-*.tmp' -print
+  )" || return 1
+  assert_equal "" "$temporary_files" "Package sync left a temporary file behind"
+}
+
+test_package_sync_adds_missing_root_version() {
+  local package_values
+
+  create_fixture "package-missing-root-version" || return 1
+  enable_package_sync || return 1
+  {
+    printf '{\n'
+    printf '  "name": "fixture-package",\n'
+    printf '  "metadata": {\n'
+    printf '    "version": "9.9.9"\n'
+    printf '  }\n'
+    printf '}\n'
+  } > "$fixture_worktree/package.json" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc package.json || return 1
+  git -C "$fixture_worktree" commit -q -m "Add versionless fixture package" ||
+    return 1
+
+  run_bumpster --patch
+
+  assert_successful_release "0.8.1" || return 1
+  package_values="$(
+    node -e '
+      const data = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+      console.log([data.version, data.metadata.version].join("|"));
+    ' "$fixture_worktree/package.json"
+  )" || return 1
+  assert_equal "0.8.1|9.9.9" "$package_values" \
+    "Package sync did not add only the root version"
+}
+
+test_invalid_package_json_is_rejected_before_release_mutation() {
+  local initial_head
+  local initial_package
+
+  create_fixture "package-invalid-json" || return 1
+  enable_package_sync || return 1
+  printf '{"name":"fixture","version":"0.8.0",}\n' \
+    > "$fixture_worktree/package.json" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc package.json || return 1
+  git -C "$fixture_worktree" commit -q -m "Add invalid fixture package" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+  initial_package="$(<"$fixture_worktree/package.json")" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Release unexpectedly accepted invalid package.json" || return 1
+  assert_contains "$cli_output" "Invalid package.json:" \
+    "Invalid package.json parse error is missing" || return 1
+  assert_contains "$cli_output" "package.json cannot be synchronized safely." \
+    "Invalid package.json release error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0" || return 1
+  assert_equal "$initial_package" "$(<"$fixture_worktree/package.json")" \
+    "Invalid package.json changed before release rejection"
+}
+
+test_non_string_package_version_is_rejected_before_release_mutation() {
+  local initial_head
+
+  create_fixture "package-non-string-version" || return 1
+  enable_package_sync || return 1
+  printf '{"name":"fixture","version":800}\n' \
+    > "$fixture_worktree/package.json" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc package.json || return 1
+  git -C "$fixture_worktree" commit -q -m "Add invalid package version" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Release unexpectedly accepted a non-string package version" || return 1
+  assert_contains "$cli_output" "the root version field must be a string" \
+    "Non-string package version error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
 }
 
 test_release_metadata_matches_published_refs() {
@@ -894,6 +1026,16 @@ run_test() {
 }
 
 main() {
+  local node_binary=""
+
+  node_binary="$(command -v node 2>/dev/null || true)"
+  if command -v asdf >/dev/null 2>&1; then
+    node_binary="$(asdf which node 2>/dev/null || printf '%s' "$node_binary")"
+  fi
+  if [[ -n "$node_binary" ]]; then
+    test_path="$(dirname "$node_binary"):$PATH"
+  fi
+
   suite_root="$(mktemp -d "${TMPDIR:-/tmp}/bumpster-tests.XXXXXX")" ||
     fail "Could not create the test directory" || return 1
 
@@ -906,6 +1048,10 @@ main() {
   run_test "failed feature push preserves the exact operation stash" test_failed_feature_push_preserves_operation_stash
   run_test "release notes extract only the requested CHANGELOG section" test_release_notes_extract_version_section
   run_test "release notes reject a version missing from CHANGELOG" test_release_notes_reject_missing_version
+  run_test "package sync updates only the root version atomically" test_package_sync_updates_only_root_version_atomically
+  run_test "package sync adds a missing root version" test_package_sync_adds_missing_root_version
+  run_test "invalid package JSON is rejected before release mutation" test_invalid_package_json_is_rejected_before_release_mutation
+  run_test "non-string package version is rejected before release mutation" test_non_string_package_version_is_rejected_before_release_mutation
   run_test "release metadata matches VERSION, tag, commit and origin/main" test_release_metadata_matches_published_refs
   run_test "patch release updates and pushes dev, main and tag" test_patch_release_flow
   run_test "minor release resets patch and publishes the release" test_minor_release_flow

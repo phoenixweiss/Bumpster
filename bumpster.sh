@@ -148,6 +148,12 @@ if [[ "$current_version" == "$new_version" ]]; then
   abort "New version is the same as the current version."
 fi
 
+# Validate package.json before hooks or the first local release mutation
+if [[ "${sync_with_package_json}" == "true" && -f "package.json" ]]; then
+  validate_package_json_for_sync "package.json" ||
+    abort "package.json cannot be synchronized safely."
+fi
+
 # Validate local and remote release state before running hooks or changing files
 preflight_release "$new_version" "$default_dev_branch" "$default_master_branch"
 
@@ -175,15 +181,8 @@ if [[ "${sync_with_package_json}" == "true" ]]; then
   release_stage="synchronizing package.json"
   if [ -f "package.json" ]; then
     log "Synchronizing version with package.json."
-    # Update version in package.json
-    while IFS= read -r line; do
-      if [[ "$line" =~ \"version\": ]]; then
-        echo "  \"version\": \"${new_version}\"," >> package.tmp
-      else
-        echo "$line" >> package.tmp
-      fi
-    done < package.json || abort "Failed to prepare the package.json version update."
-    mv package.tmp package.json || abort "Failed to replace package.json."
+    update_package_json_version "package.json" "$new_version" ||
+      abort "Failed to update the root package.json version safely."
     git add package.json || abort "Failed to stage package.json."
     log "Updated version in package.json to ${new_version}."
   else

@@ -46,6 +46,128 @@ run_hook() {
   fi
 }
 
+# Function to validate package.json before any release mutation
+validate_package_json_for_sync() {
+  local package_file="$1"
+
+  if ! command -v node >/dev/null 2>&1; then
+    log "Node.js is required when SYNC_WITH_PACKAGE_JSON is enabled." "ERROR"
+    return 1
+  fi
+  if ! node --version >/dev/null 2>&1; then
+    log "Node.js was found but could not be executed for package.json synchronization." "ERROR"
+    return 1
+  fi
+
+  node - "$package_file" <<'NODE'
+const fs = require("fs");
+
+const packageFile = process.argv[2];
+
+try {
+  const fileStat = fs.lstatSync(packageFile);
+  if (fileStat.isSymbolicLink() || !fileStat.isFile()) {
+    throw new Error("the path must be a regular file, not a symbolic link");
+  }
+
+  const packageData = JSON.parse(fs.readFileSync(packageFile, "utf8"));
+  if (packageData === null || Array.isArray(packageData) || typeof packageData !== "object") {
+    throw new Error("the root JSON value must be an object");
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(packageData, "version") &&
+    typeof packageData.version !== "string"
+  ) {
+    throw new Error("the root version field must be a string");
+  }
+} catch (error) {
+  console.error(`Invalid ${packageFile}: ${error.message}`);
+  process.exit(1);
+}
+NODE
+}
+
+# Function to atomically update only the root package.json version field
+update_package_json_version() {
+  local package_file="$1"
+  local new_version="$2"
+
+  node - "$package_file" "$new_version" <<'NODE'
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+
+const packageFile = process.argv[2];
+const newVersion = process.argv[3];
+const directory = path.dirname(packageFile);
+const basename = path.basename(packageFile);
+const temporaryFile = path.join(
+  directory,
+  `.${basename}.bumpster-${process.pid}-${Date.now()}-${crypto.randomBytes(6).toString("hex")}.tmp`
+);
+let temporaryFd = null;
+
+try {
+  const fileStat = fs.lstatSync(packageFile);
+  if (fileStat.isSymbolicLink() || !fileStat.isFile()) {
+    throw new Error("the path must be a regular file, not a symbolic link");
+  }
+
+  const source = fs.readFileSync(packageFile, "utf8");
+  const packageData = JSON.parse(source);
+  if (packageData === null || Array.isArray(packageData) || typeof packageData !== "object") {
+    throw new Error("the root JSON value must be an object");
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(packageData, "version") &&
+    typeof packageData.version !== "string"
+  ) {
+    throw new Error("the root version field must be a string");
+  }
+
+  packageData.version = newVersion;
+
+  const indentMatch = source.match(/\n([ \t]+)"/);
+  const indent = indentMatch ? indentMatch[1] : undefined;
+  const usesCrLf = source.includes("\r\n");
+  const hasFinalNewline = source.endsWith("\n");
+  let output = JSON.stringify(packageData, null, indent);
+  if (usesCrLf) {
+    output = output.replace(/\n/g, "\r\n");
+  }
+  if (hasFinalNewline) {
+    output += usesCrLf ? "\r\n" : "\n";
+  }
+
+  temporaryFd = fs.openSync(temporaryFile, "wx", fileStat.mode & 0o777);
+  fs.writeFileSync(temporaryFd, output, "utf8");
+  fs.fsyncSync(temporaryFd);
+  fs.closeSync(temporaryFd);
+  temporaryFd = null;
+  fs.renameSync(temporaryFile, packageFile);
+} catch (error) {
+  console.error(`Could not update ${packageFile}: ${error.message}`);
+  process.exitCode = 1;
+} finally {
+  if (temporaryFd !== null) {
+    try {
+      fs.closeSync(temporaryFd);
+    } catch (_) {
+      // Preserve the original error.
+    }
+  }
+  try {
+    fs.unlinkSync(temporaryFile);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.error(`Could not remove temporary file ${temporaryFile}: ${error.message}`);
+      process.exitCode = 1;
+    }
+  }
+}
+NODE
+}
+
 # Function to display the version of Bumpster
 display_version() {
   if [ -f "$local_version_file" ]; then

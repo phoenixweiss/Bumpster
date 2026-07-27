@@ -110,7 +110,18 @@ bump -p
 
 ### Synchronizing with package.json
 
-Bumpster supports optional synchronization between the `VERSION` file and `package.json`. When enabled, updating the version with `bump` will automatically synchronize the version in `package.json`. If `package.json` is not found, the operation is skipped with a log message.
+Bumpster supports optional synchronization between the `VERSION` file and
+`package.json`. When enabled, updating the version with `bump` synchronizes only
+the root `version` field; nested fields named `version` are left unchanged. If
+the root field is missing, it is added.
+
+Synchronization requires an executable Node.js installation. Bumpster parses
+and validates the JSON before any release mutation, preserves the existing
+indentation style, line ending and file permissions, then replaces
+`package.json` atomically through a unique temporary file in the same directory.
+Invalid JSON or a non-string root `version` aborts the release without changing
+`VERSION` or `package.json`. If `package.json` is not found, synchronization is
+skipped with a log message.
 
 **Example Configuration**:
 
