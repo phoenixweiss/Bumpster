@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-28
+
 ### Added
 
 - A reproducible runtime packager that builds a versioned archive from an
@@ -41,6 +43,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   retain custom or physically canonicalized `BUMPSTER_HOME` paths.
 - Help output no longer depends on a network request to the mutable `main`
   branch to display the installed version.
+- Runtime packaging, installation, and self-update accept either `shasum` or
+  `sha256sum`, including the tools available in Git Bash.
+- Windows self-update releases the running installation before activating the
+  verified runtime, avoiding file-lock failures during the transactional rename.
+- Cross-platform install fixtures retain the historical migration tag, preserve
+  the Git Bash `curl` path, and use native Windows file URLs.
 
 ## [0.8.5] - 2026-07-27
 
@@ -176,7 +184,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.5...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.2...v0.8.3
