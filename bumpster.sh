@@ -32,6 +32,7 @@ version_type=""
 create_local_config=""
 create_feature_branch=""
 close_feature_branch=""
+show_status=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)                    usage ;;
@@ -40,7 +41,7 @@ while [[ $# -gt 0 ]]; do
     -m | --minor )                  version_type="minor" ;;
     -p | --patch )                  version_type="patch" ;;
     -u | --update )                 run_update_command ; exit $? ;;
-    -s | --status )                 check_status ; exit 0 ;;
+    -s | --status )                 show_status="true" ;;
     -l | --create-local-config )    create_local_config="true" ;;
     -f | --create-feature )         create_feature_branch="true" ;;
     -c | --close-feature )          close_feature_branch="true" ;;
@@ -50,13 +51,21 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# Preload configuration if branch-management commands were requested
-if [[ "$close_feature_branch" == "true" || "$create_feature_branch" == "true" ]]; then
+# Preload configuration for commands that depend on configured branch names
+if [[ "$close_feature_branch" == "true" ||
+  "$create_feature_branch" == "true" ||
+  "$show_status" == "true" ]]; then
   if [ -f "$local_config_file" ]; then
     load_config "$local_config_file"
   elif [ -f "$global_config_file" ]; then
     load_config "$global_config_file"
   fi
+fi
+
+# Show repository status if the option was passed
+if [[ "$show_status" == "true" ]]; then
+  check_status
+  exit $?
 fi
 
 # Close a feature branch if the option was passed
@@ -95,18 +104,8 @@ if [ -z "${BASH_VERSION:-}" ]; then
   abort "Bash is required to run this script."
 fi
 
-# Ensure necessary commands are available
-required_commands=(git)
-for cmd in "${required_commands[@]}"; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    abort "Error: $cmd is not installed. Please install it and try again."
-  fi
-done
-
-# Ensure the script is run in a git repository
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  abort "Git repository not found. Please initialize git first."
-fi
+# Ensure Git is available and the release starts inside a repository
+require_git_repository
 
 # Ensure there are no uncommitted changes
 if [[ -n $(git status --porcelain) ]]; then

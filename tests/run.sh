@@ -346,6 +346,115 @@ test_install_and_update_suite() {
   bash "$project_root/tests/install.sh"
 }
 
+test_status_uses_default_configuration() {
+  create_fixture "status-default-config" || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" "Status command failed: $cli_output" || return 1
+  assert_contains "$cli_output" "Current branch: dev" \
+    "Status does not report the current branch" || return 1
+  assert_contains "$cli_output" "You are on the development branch." \
+    "Status does not recognize the default development branch" || return 1
+  assert_contains "$cli_output" "Uncommitted changes: 0" \
+    "Status reports the wrong worktree count" || return 1
+  assert_contains "$cli_output" "Unpushed commits: 0" \
+    "Status reports the wrong unpushed commit count" || return 1
+
+  printf 'Local status change\n' > "$fixture_worktree/status.txt" || return 1
+  git -C "$fixture_worktree" add status.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add local status change" || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" \
+    "Status failed with an unpushed commit: $cli_output" || return 1
+  assert_contains "$cli_output" "Unpushed commits: 1" \
+    "Status does not count commits ahead of the upstream"
+}
+
+test_status_uses_local_branch_configuration() {
+  create_fixture "status-local-config" || return 1
+  git -C "$fixture_worktree" checkout -q -b integration || return 1
+  git -C "$fixture_worktree" push -q -u origin integration || return 1
+  printf '%s\n' \
+    'GIT_MASTER_BRANCH="stable"' \
+    'GIT_DEVELOP_BRANCH="integration"' \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" "Configured status command failed: $cli_output" ||
+    return 1
+  assert_contains "$cli_output" "Current branch: integration" \
+    "Status does not report the configured branch" || return 1
+  assert_contains "$cli_output" "You are on the development branch." \
+    "Status ignores the configured development branch" || return 1
+  assert_not_contains "$cli_output" "You are on a feature branch." \
+    "Configured development branch is classified as a feature branch"
+}
+
+test_status_uses_global_branch_configuration() {
+  create_fixture "status-global-config" || return 1
+  git -C "$fixture_worktree" checkout -q -b integration || return 1
+  git -C "$fixture_worktree" push -q -u origin integration || return 1
+  rm "$fixture_worktree/.bumpsterrc" || return 1
+  printf '%s\n' \
+    'GIT_MASTER_BRANCH="stable"' \
+    'GIT_DEVELOP_BRANCH="integration"' \
+    > "$fixture_home/.bumpsterrc" || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" "Global-config status failed: $cli_output" ||
+    return 1
+  assert_contains "$cli_output" "Current branch: integration" \
+    "Status does not report the global-config branch" || return 1
+  assert_contains "$cli_output" "You are on the development branch." \
+    "Status ignores the global development branch" || return 1
+  assert_not_contains "$cli_output" "You are on a feature branch." \
+    "Global development branch is classified as a feature branch"
+}
+
+test_status_rejects_non_repository() {
+  local non_repository
+
+  create_fixture "status-non-repository" || return 1
+  non_repository="$fixture_root/not-a-repository"
+  mkdir -p "$non_repository" || return 1
+
+  cli_output="$(
+    cd "$non_repository" &&
+      HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      PATH="$test_path" \
+      bash "$project_root/bumpster.sh" --status 2>&1
+  )"
+  cli_status=$?
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Status unexpectedly succeeded outside a Git repository" || return 1
+  assert_contains "$cli_output" "Git repository not found." \
+    "Status repository error is unclear" || return 1
+  assert_not_contains "$cli_output" "fatal:" \
+    "Status exposes raw Git errors outside a repository"
+}
+
+test_status_handles_missing_upstream() {
+  create_fixture "status-missing-upstream" || return 1
+  git -C "$fixture_worktree" branch --unset-upstream dev || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" \
+    "Status failed without an upstream branch: $cli_output" || return 1
+  assert_contains "$cli_output" \
+    "Unpushed commits: unavailable (no upstream branch)." \
+    "Status does not explain the missing upstream" || return 1
+  assert_not_contains "$cli_output" "fatal:" \
+    "Status exposes raw Git errors without an upstream"
+}
+
 test_clean_feature_branch_is_closed() {
   local current_branch
   local remote_feature_content
@@ -1132,6 +1241,11 @@ main() {
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
   run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
   run_test "install and update flows are transactional" test_install_and_update_suite
+  run_test "status uses the default branch configuration" test_status_uses_default_configuration
+  run_test "status uses local custom branch configuration" test_status_uses_local_branch_configuration
+  run_test "status uses global custom branch configuration" test_status_uses_global_branch_configuration
+  run_test "status rejects execution outside a Git repository" test_status_rejects_non_repository
+  run_test "status handles a missing upstream without raw Git errors" test_status_handles_missing_upstream
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
   run_test "clean feature close leaves existing stash untouched" test_existing_stash_is_untouched_by_clean_feature_close

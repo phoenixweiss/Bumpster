@@ -183,6 +183,16 @@ abort() {
   exit 1
 }
 
+# Function to require Git and an initialized repository for Git commands
+require_git_repository() {
+  if ! command -v git >/dev/null 2>&1; then
+    abort "Git is not installed. Please install it and try again."
+  fi
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    abort "Git repository not found. Please initialize git first."
+  fi
+}
+
 # Function to create a config file with the given path and values
 create_config() {
   local config_file="$1"
@@ -766,23 +776,52 @@ update_bumpster() (
 
 # Function to check repository status
 check_status() {
-  local current_branch
-  current_branch=$(git rev-parse --abbrev-ref HEAD)
-  log "Current branch: $current_branch"
-
+  local current_branch=""
   local effective_develop_branch="${develop_branch:-$default_develop_branch}"
   local effective_master_branch="${master_branch:-$default_master_branch}"
+  local worktree_status=""
+  local uncommitted_count=0
+  local upstream_branch=""
+  local unpushed_count=""
 
-  if [[ "$current_branch" == "$effective_develop_branch" ]]; then
+  require_git_repository
+  current_branch="$(git rev-parse --abbrev-ref HEAD)" ||
+    abort "Could not determine the current branch."
+  log "Current branch: $current_branch"
+
+  if [[ "$current_branch" == "HEAD" ]]; then
+    log "You are in detached HEAD state."
+  elif [[ "$current_branch" == "$effective_develop_branch" ]]; then
     log "You are on the development branch. Ready for new features."
   elif [[ "$current_branch" == "$effective_master_branch" ]]; then
-    log "You are on the master branch. Only releases should be here."
+    log "You are on the release branch. Only releases should be here."
   else
     log "You are on a feature branch. Merge your changes into the development branch when ready."
   fi
 
-  log "Uncommitted changes: $(git status --porcelain | wc -l)"
-  log "Unpushed commits: $(git cherry -v | wc -l)"
+  worktree_status="$(git status --porcelain)" ||
+    abort "Could not inspect the working tree."
+  if [[ -n "$worktree_status" ]]; then
+    while IFS= read -r; do
+      uncommitted_count=$((uncommitted_count + 1))
+    done <<< "$worktree_status"
+  fi
+  log "Uncommitted changes: $uncommitted_count"
+
+  if [[ "$current_branch" != "HEAD" ]] &&
+    upstream_branch="$(
+      git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null
+    )"; then
+    if unpushed_count="$(
+      git rev-list --count "$upstream_branch..HEAD" 2>/dev/null
+    )"; then
+      log "Unpushed commits: $unpushed_count"
+    else
+      log "Unpushed commits: unavailable (could not compare with '$upstream_branch')."
+    fi
+  else
+    log "Unpushed commits: unavailable (no upstream branch)."
+  fi
 }
 
 # Function to show usage and version information
@@ -1123,6 +1162,8 @@ create_feature() {
   # Use the configured develop branch or fall back to default_develop_branch
   local dev_branch="${develop_branch:-$default_develop_branch}"
 
+  require_git_repository
+
   # Ensure the current branch is dev
   current_branch=$(git rev-parse --abbrev-ref HEAD)
   if [[ "$current_branch" != "$dev_branch" ]]; then
@@ -1222,9 +1263,7 @@ close_feature() {
   local stash_before=""
   local created_stash_oid=""
 
-  if ! git rev-parse --git-dir >/dev/null 2>&1; then
-    abort "Git repository not found. Please initialize git first."
-  fi
+  require_git_repository
   current_branch="$(git rev-parse --abbrev-ref HEAD)" ||
     abort "Could not determine the current branch."
 

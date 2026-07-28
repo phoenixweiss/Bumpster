@@ -281,12 +281,15 @@ bump -s
 
 This displays:
 
-- Current branch.
+- Current branch and whether it matches the configured development or release
+  branch.
 - Number of uncommitted changes.
-- Number of unpushed commits.
+- Number of unpushed commits when the current branch has a resolvable upstream;
+  otherwise an explicit unavailable status.
 
 Run this command inside a Git repository. It is read-only and does not start a
-release.
+release. Bumpster loads the selected local or global configuration before
+classifying the current branch.
 
 ### Creating a Local Configuration File
 
