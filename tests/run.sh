@@ -163,6 +163,20 @@ run_bumpster() {
   cli_status=$?
 }
 
+run_bumpster_with_home() {
+  local runtime_home="$1"
+  shift
+
+  cli_output="$(
+    cd "$fixture_worktree" &&
+      HOME="$fixture_home" \
+      BUMPSTER_HOME="$runtime_home" \
+      PATH="$test_path" \
+      bash "$project_root/bumpster.sh" "$@" 2>&1
+  )"
+  cli_status=$?
+}
+
 run_bumpster_with_input() {
   local input="$1"
   shift
@@ -256,6 +270,13 @@ create_remote_commit() {
   git -C "$remote_worktree" add remote-change.txt || return 1
   git -C "$remote_worktree" commit -q -m "$marker" || return 1
   git -C "$remote_worktree" push -q origin "$branch_name"
+}
+
+configure_custom_release_branches() {
+  git -C "$fixture_worktree" checkout -q -b stable main || return 1
+  git -C "$fixture_worktree" push -q -u origin stable || return 1
+  git -C "$fixture_worktree" checkout -q -b integration dev || return 1
+  git -C "$fixture_worktree" push -q -u origin integration
 }
 
 install_main_rejecting_hook() {
@@ -453,6 +474,172 @@ test_status_handles_missing_upstream() {
     "Status does not explain the missing upstream" || return 1
   assert_not_contains "$cli_output" "fatal:" \
     "Status exposes raw Git errors without an upstream"
+}
+
+test_local_config_takes_priority_over_global_config() {
+  create_fixture "config-local-priority" || return 1
+  git -C "$fixture_worktree" checkout -q -b integration || return 1
+  git -C "$fixture_worktree" push -q -u origin integration || return 1
+  printf 'GIT_DEVELOP_BRANCH="dev"\n' > "$fixture_home/.bumpsterrc" || return 1
+  printf 'GIT_DEVELOP_BRANCH="integration"\n' \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" "Local-priority status failed: $cli_output" ||
+    return 1
+  assert_contains "$cli_output" "You are on the development branch." \
+    "Global configuration overrode the selected local configuration"
+}
+
+test_config_file_and_environment_precedence() {
+  create_fixture "config-environment-precedence" || return 1
+  git -C "$fixture_worktree" checkout -q -b integration || return 1
+  git -C "$fixture_worktree" push -q -u origin integration || return 1
+  printf 'ENABLE_LOGGING="false"\n' > "$fixture_worktree/.bumpsterrc" ||
+    return 1
+
+  cli_output="$(
+    cd "$fixture_worktree" &&
+      HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      GIT_DEVELOP_BRANCH="integration" \
+      PATH="$test_path" \
+      bash "$project_root/bumpster.sh" --status 2>&1
+  )"
+  cli_status=$?
+
+  assert_equal "0" "$cli_status" "Environment-backed status failed: $cli_output" ||
+    return 1
+  assert_contains "$cli_output" "You are on the development branch." \
+    "Environment did not supply a value omitted by the selected config" ||
+    return 1
+
+  printf 'GIT_DEVELOP_BRANCH="dev"\n' > "$fixture_worktree/.bumpsterrc" ||
+    return 1
+  cli_output="$(
+    cd "$fixture_worktree" &&
+      HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      GIT_DEVELOP_BRANCH="integration" \
+      PATH="$test_path" \
+      bash "$project_root/bumpster.sh" --status 2>&1
+  )"
+  cli_status=$?
+
+  assert_equal "0" "$cli_status" "File-priority status failed: $cli_output" ||
+    return 1
+  assert_contains "$cli_output" "You are on a feature branch." \
+    "Environment overrode a value assigned by the selected config"
+}
+
+test_custom_release_branches_and_before_after_options() {
+  local remote_tag_commit
+
+  create_fixture "custom-release-branches" || return 1
+  configure_custom_release_branches || return 1
+  git -C "$fixture_worktree" checkout -q -b release-work || return 1
+  printf '%s\n' \
+    'GIT_MASTER_BRANCH="stable"' \
+    'GIT_DEVELOP_BRANCH="integration"' \
+    'BEFORE_BUMP_BRANCH="release-work"' \
+    'AFTER_BUMP_BRANCH="release-work"' \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc || return 1
+  git -C "$fixture_worktree" commit -q -m "Configure custom release branches" ||
+    return 1
+
+  run_bumpster --patch
+
+  assert_equal "0" "$cli_status" "Custom release failed: $cli_output" || return 1
+  assert_equal "release-work" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Release did not return to AFTER_BUMP_BRANCH" || return 1
+  assert_equal "0.8.1" \
+    "$(git -C "$fixture_worktree" show integration:VERSION)" \
+    "Configured development branch has the wrong version" || return 1
+  assert_equal "0.8.1" \
+    "$(git -C "$fixture_worktree" show stable:VERSION)" \
+    "Configured release branch has the wrong version" || return 1
+  assert_equal "$(git -C "$fixture_worktree" rev-parse integration)" \
+    "$(git --git-dir="$fixture_origin" rev-parse refs/heads/integration)" \
+    "Configured development branch was not published" || return 1
+  assert_equal "$(git -C "$fixture_worktree" rev-parse stable)" \
+    "$(git --git-dir="$fixture_origin" rev-parse refs/heads/stable)" \
+    "Configured release branch was not published" || return 1
+  remote_tag_commit="$(
+    git --git-dir="$fixture_origin" rev-list -n 1 refs/tags/v0.8.1
+  )" || return 1
+  assert_equal "$(git -C "$fixture_worktree" rev-parse integration)" \
+    "$remote_tag_commit" "Custom release tag points to the wrong commit"
+}
+
+test_missing_after_branch_falls_back_to_configured_development() {
+  create_fixture "missing-after-branch" || return 1
+  configure_custom_release_branches || return 1
+  printf '%s\n' \
+    'GIT_MASTER_BRANCH="stable"' \
+    'GIT_DEVELOP_BRANCH="integration"' \
+    'BEFORE_BUMP_BRANCH="integration"' \
+    'AFTER_BUMP_BRANCH="missing-return-branch"' \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc || return 1
+  git -C "$fixture_worktree" commit -q -m "Configure missing return branch" ||
+    return 1
+
+  run_bumpster --patch
+
+  assert_equal "0" "$cli_status" \
+    "Release with missing return branch failed: $cli_output" || return 1
+  assert_equal "integration" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Missing AFTER_BUMP_BRANCH did not fall back to configured development"
+}
+
+test_hooks_use_project_priority_and_version_environment() {
+  local runtime_home
+  local project_hook_dir
+  local global_hook_dir
+  local hook_log
+
+  create_fixture "hooks-priority-and-versions" || return 1
+  runtime_home="$fixture_root/runtime-home"
+  project_hook_dir="$fixture_worktree/.bumpster/hooks"
+  global_hook_dir="$runtime_home/hooks"
+  hook_log="$fixture_root/hooks.log"
+  mkdir -p "$project_hook_dir" "$global_hook_dir" || return 1
+  cp "$project_root/VERSION" "$runtime_home/VERSION" || return 1
+  printf '/.bumpster/\n' >> "$fixture_worktree/.git/info/exclude" || return 1
+
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016
+    printf 'printf "global-pre:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" > %q\n' \
+      "$hook_log"
+  } > "$global_hook_dir/pre-bump" || return 1
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016
+    printf 'printf "project-pre:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" > %q\n' \
+      "$hook_log"
+  } > "$project_hook_dir/pre-bump" || return 1
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016
+    printf 'printf "project-post:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" >> %q\n' \
+      "$hook_log"
+  } > "$project_hook_dir/post-bump" || return 1
+  chmod +x \
+    "$global_hook_dir/pre-bump" \
+    "$project_hook_dir/pre-bump" \
+    "$project_hook_dir/post-bump" || return 1
+
+  run_bumpster_with_home "$runtime_home" --patch
+
+  assert_successful_release "0.8.1" || return 1
+  assert_equal $'project-pre:0.8.0:0.8.1\nproject-post:0.8.0:0.8.1' \
+    "$(<"$hook_log")" \
+    "Hooks did not use project priority or receive both versions"
 }
 
 test_clean_feature_branch_is_closed() {
@@ -1246,6 +1433,11 @@ main() {
   run_test "status uses global custom branch configuration" test_status_uses_global_branch_configuration
   run_test "status rejects execution outside a Git repository" test_status_rejects_non_repository
   run_test "status handles a missing upstream without raw Git errors" test_status_handles_missing_upstream
+  run_test "local configuration takes priority over global configuration" test_local_config_takes_priority_over_global_config
+  run_test "configuration files and environment values have defined precedence" test_config_file_and_environment_precedence
+  run_test "custom release branches honor before and after options" test_custom_release_branches_and_before_after_options
+  run_test "missing after-bump branch falls back to configured development" test_missing_after_branch_falls_back_to_configured_development
+  run_test "hooks use project priority and receive both versions" test_hooks_use_project_priority_and_version_environment
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
   run_test "clean feature close leaves existing stash untouched" test_existing_stash_is_untouched_by_clean_feature_close

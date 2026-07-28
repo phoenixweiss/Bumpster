@@ -221,12 +221,12 @@ current_branch=$(git rev-parse --abbrev-ref HEAD)
 log "Current branch is $current_branch"
 
 # Determine the branch to switch to after bump
-after_bump_branch=${AFTER_BUMP_BRANCH:-$default_develop_branch}
+after_bump_branch="${after_bump_branch:-$default_dev_branch}"
 
 # Ensure the branch exists
 if ! git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
-  log "Branch '$after_bump_branch' does not exist. Falling back to development branch '$default_develop_branch'."
-  after_bump_branch="$default_develop_branch"
+  log "Branch '$after_bump_branch' does not exist. Falling back to development branch '$default_dev_branch'."
+  after_bump_branch="$default_dev_branch"
 fi
 
 # Switch to the after bump branch
@@ -284,8 +284,8 @@ if [[ -n "$after_bump_branch" ]]; then
   if git show-ref --verify --quiet "refs/heads/$after_bump_branch"; then
     git checkout "$after_bump_branch" || abort "Failed to switch to branch '$after_bump_branch'."
   else
-    log "Branch '$after_bump_branch' does not exist. Falling back to '$default_master_branch'."
-    git checkout "$default_master_branch" || abort "Failed to switch to branch '$default_master_branch'."
+    log "Branch '$after_bump_branch' does not exist. Falling back to '$default_dev_branch'."
+    git checkout "$default_dev_branch" || abort "Failed to switch to branch '$default_dev_branch'."
   fi
 fi
 
