@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-07-28
+
 ### Added
 
 - Cross-platform public Release smoke tests for checksum, provenance, runtime
@@ -191,7 +193,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.3...v0.8.4
