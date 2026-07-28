@@ -23,7 +23,7 @@
 - Configurable branch names for `master` and `develop`.
 - Feature branch creation and closing with customizable behavior.
 - Local and global configuration files for flexibility.
-- Optional logging for all operations.
+- Optional logging for supported operations.
 - Custom hooks (pre-bump/post-bump) for project-specific workflows.
 - Minimal footprint: installed in `~/.bumpster`.
 - Easy removal: delete the `.bumpster` directory to uninstall.
@@ -59,6 +59,11 @@ echo 'export PATH="$HOME/.bumpster/bin:$PATH"' >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
+The installer always creates the `bumpster` command wrapper. It also creates
+the shorter `bump` wrapper when that command name is not already in use. The
+examples below use `bumpster` as the canonical command; every shown `bump`
+variant is an optional equivalent.
+
 ### Migrating from 0.8.x
 
 Versions through `0.8.x` use the legacy updater: it downloads the source archive
@@ -92,15 +97,14 @@ files are outside the runtime directory and remain in place.
 
 The successful migration prints the automatic backup path. Keep it until the
 new version, hooks, and configuration have been checked; it can then be removed
-manually. If `v0.9.0` and its runtime assets are not listed in
-[GitHub Releases](https://github.com/phoenixweiss/Bumpster/releases), keep the
-current installation instead of running the legacy updater.
+manually. The pinned installer and its runtime assets remain available in the
+[v0.9.0 GitHub Release](https://github.com/phoenixweiss/Bumpster/releases/tag/v0.9.0).
 
 ## Usage
 
-### Pre-flight Checks
+### Release Pre-flight Checks
 
-Before running any command:
+Before running `--major`, `--minor`, `--patch`, or the interactive release flow:
 
 - Ensure you are inside an initialized Git repository (`git rev-parse --git-dir` should print the `.git` path and exit without errors).
 - Ensure `VERSION` exists and contains a stable semantic version in the exact
@@ -125,6 +129,11 @@ commands. A retry command is shown only when a rejected atomic publication left
 the remote refs unchanged.
 
 ### Bumping Versions
+
+Running `bumpster` without an option starts the release flow and asks for
+`major`, `minor`, or `patch`; pressing Enter selects `patch`. Use an explicit
+version option in automation and whenever the intended bump should be
+unambiguous.
 
 **Bump major version**:
 
@@ -153,9 +162,9 @@ bump -p
 ### Synchronizing with package.json
 
 Bumpster supports optional synchronization between the `VERSION` file and
-`package.json`. When enabled, updating the version with `bump` synchronizes only
-the root `version` field; nested fields named `version` are left unchanged. If
-the root field is missing, it is added.
+`package.json`. When enabled, a release command synchronizes only the root
+`version` field; nested fields named `version` are left unchanged. If the root
+field is missing, it is added.
 
 Synchronization requires an executable Node.js installation. Bumpster parses
 and validates the JSON before any release mutation, preserves the existing
@@ -225,7 +234,8 @@ starts restores the previous installation and returns a non-zero status.
 
 ### Customizing Branch Names
 
-You can specify custom branch names by providing a configuration file or environment variables. Default branch names are `main` and `dev`.
+You can specify custom branch names in a configuration file. Default branch
+names are `main` and `dev`.
 
 Example configuration in `.bumpsterrc`:
 
@@ -254,7 +264,10 @@ AFTER_BUMP_BRANCH="dev"
 
 ### BEFORE_BUMP_BRANCH option
 
-This option defines the branch you must be on before running `bumpster`. By default it expects the development branch. Bumpster validates that the configured branch exists locally and that you are currently on it, aborting otherwise so every release starts from the correct branch.
+This option defines the branch you must be on before starting a release. By
+default it expects the development branch. Bumpster validates that the
+configured branch exists locally and that you are currently on it, aborting
+otherwise so every release starts from the correct branch.
 
 ### Checking Repository Status
 
@@ -271,6 +284,9 @@ This displays:
 - Current branch.
 - Number of uncommitted changes.
 - Number of unpushed commits.
+
+Run this command inside a Git repository. It is read-only and does not start a
+release.
 
 ### Creating a Local Configuration File
 
@@ -314,12 +330,20 @@ stash and reports its exact commit ID for manual recovery.
 
 ### Custom Hooks
 
-You can extend Bumpster by providing executable scripts in `.bumpster/hooks/` inside your project (or `~/.bumpster/hooks/` for global hooks). The following hook names are supported:
+You can extend Bumpster by providing executable scripts in `.bumpster/hooks/`
+inside your project (or `~/.bumpster/hooks/` for global hooks). An executable
+project hook takes priority over a global hook with the same name. The following
+hook names are supported:
 
-- `pre-bump` - runs after the new version is calculated but before files are updated/committed.
-- `post-bump` - runs after the release process completes and branches are synchronized.
+- `pre-bump` - runs after release preflight and version calculation, but before
+  files are updated or committed.
+- `post-bump` - runs after the atomic push and the final branch checkout.
 
-Hooks receive the environment variables `BUMPSTER_PREV_VERSION` and `BUMPSTER_NEW_VERSION` so you can inspect both versions. If a hook exits with a non-zero status, the bump process is aborted.
+Hooks receive the environment variables `BUMPSTER_PREV_VERSION` and
+`BUMPSTER_NEW_VERSION` so they can inspect both versions. A non-zero
+`pre-bump` status aborts before the first release mutation. A non-zero
+`post-bump` status makes the command fail, but the already published branches
+and tag are not rolled back.
 
 **Example use-cases**
 
@@ -341,10 +365,16 @@ Hooks receive the environment variables `BUMPSTER_PREV_VERSION` and `BUMPSTER_NE
 
 ## Configuration
 
-Bumpster uses configuration files (`.bumpsterrc`) to customize its behavior. It supports two types of configuration files:
+Bumpster uses configuration files (`.bumpsterrc`) to customize its behavior. It
+supports two locations:
 
 - **Global Configuration**: Located in `~/.bumpsterrc`.
-- **Local Configuration**: Located in the project directory (`./.bumpsterrc`). Local configurations override global ones.
+- **Local Configuration**: Located in the project directory (`./.bumpsterrc`).
+
+When both files exist, Bumpster selects the local file and does not load or
+merge the global file. Exported variables with the same names can provide
+values omitted by the selected file, but values assigned in that file take
+priority.
 
 ### Example Configuration
 
@@ -358,15 +388,20 @@ DELETE_FEATURE_BRANCH_AFTER_MERGE="false"
 ASK_BEFORE_DELETING_FEATURE_BRANCH="true"
 SYNC_WITH_PACKAGE_JSON="true"
 AFTER_BUMP_BRANCH="dev"
+BEFORE_BUMP_BRANCH="dev"
 ```
 
 ## Requirements
 
-- [curl](https://curl.se/)
-- [bash](https://www.gnu.org/software/bash/)
-- [git](https://git-scm.com/)
+- [Bash](https://www.gnu.org/software/bash/) and
+  [Git](https://git-scm.com/) for the CLI.
+- [curl](https://curl.se/), `tar`, and either `shasum` or `sha256sum` for
+  installation and self-update.
+- Node.js only when `SYNC_WITH_PACKAGE_JSON="true"`.
+- GitHub CLI only for optional manual attestation verification.
 
-Before using Bumpster, ensure you have an initialized Git repository.
+Release, status, and feature-branch commands must be run inside an initialized
+Git repository.
 
 ## Development and Testing
 
@@ -414,7 +449,7 @@ Release notes are maintained in the canonical English `CHANGELOG.md`. Preview
 the notes that would be published for a version with:
 
 ```bash
-./scripts/release-notes.sh 0.8.5
+./scripts/release-notes.sh 0.9.1
 ```
 
 Each scenario creates a temporary working repository, an isolated `HOME`, and a
@@ -457,13 +492,30 @@ gh attestation verify bumpster-X.Y.Z.tar.gz --repo phoenixweiss/Bumpster
 The checksum verifies the downloaded bytes. The attestation additionally ties
 the runtime archive to the Bumpster repository and its GitHub Actions build.
 
+### Documentation Languages
+
+English is the canonical language for source comments, CLI output, configuration
+examples, `README.md`, `CHANGELOG.md`, GitHub Release notes, and the primary
+website. Russian is the first maintained additional language in
+`README_RU.md` and the future Russian website locale.
+
+Write user-facing documentation in English first, then update the Russian
+version with the same meaning in the same change. Future translations must use
+English as their source and fall back to English when incomplete; do not mix
+languages inside one interface without an explicit locale switch. New commit
+messages use short, simple English.
+
 ## Uninstalling Bumpster
 
-To completely remove Bumpster, delete the `~/.bumpster` directory:
+Remove the installed runtime and command wrappers with:
 
 ```bash
-rm -rf ~/.bumpster
+rm -rf -- "$HOME/.bumpster"
 ```
+
+The global configuration file `~/.bumpsterrc`, project-level `.bumpsterrc`
+files, and versioned backup directories are intentionally outside that path.
+Remove them separately only after checking that they are no longer needed.
 
 ## Author
 
