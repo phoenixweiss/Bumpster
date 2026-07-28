@@ -166,6 +166,21 @@ create_legacy_installation() {
   chmod +x "$target_home/bin/bumpster" "$target_home/bin/bump"
 }
 
+release_url_for_directory() {
+  local release_dir="$1"
+  local windows_path
+
+  case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*)
+      windows_path="$(cygpath -m "$release_dir")" || return 1
+      printf 'file:///%s\n' "$windows_path"
+      ;;
+    *)
+      printf 'file://%s\n' "$release_dir"
+      ;;
+  esac
+}
+
 run_installer() {
   local home_dir="$1"
   local target_home="$2"
@@ -174,7 +189,7 @@ run_installer() {
 
   HOME="$home_dir" \
     BUMPSTER_HOME="$target_home" \
-    BUMPSTER_RELEASE_DOWNLOAD_URL="file://$release_dir" \
+    BUMPSTER_RELEASE_DOWNLOAD_URL="$(release_url_for_directory "$release_dir")" \
     BUMPSTER_TEST_ALLOW_FILE_RELEASES=true \
     PATH="$path_value" \
     bash "$project_root/install.sh"
@@ -533,7 +548,7 @@ test_self_update_uses_verified_assets() {
 
   output="$(
     HOME="$home_dir" \
-      BUMPSTER_RELEASE_DOWNLOAD_URL="file://$release_091" \
+      BUMPSTER_RELEASE_DOWNLOAD_URL="$(release_url_for_directory "$release_091")" \
       BUMPSTER_TEST_ALLOW_FILE_RELEASES=true \
       PATH="$target_home/bin:$runtime_path" \
       "$target_home/bin/bumpster" --update 2>&1
@@ -584,7 +599,7 @@ test_self_update_failure_rolls_back() {
 
   if output="$(
     HOME="$home_dir" \
-      BUMPSTER_RELEASE_DOWNLOAD_URL="file://$release_091" \
+      BUMPSTER_RELEASE_DOWNLOAD_URL="$(release_url_for_directory "$release_091")" \
       BUMPSTER_TEST_ALLOW_FILE_RELEASES=true \
       PATH="$fake_bin:$target_home/bin:$runtime_path" \
       "$target_home/bin/bumpster" --update 2>&1
@@ -624,7 +639,7 @@ test_self_update_noop_is_clean() {
 
   output="$(
     HOME="$home_dir" \
-      BUMPSTER_RELEASE_DOWNLOAD_URL="file://$release_dir" \
+      BUMPSTER_RELEASE_DOWNLOAD_URL="$(release_url_for_directory "$release_dir")" \
       BUMPSTER_TEST_ALLOW_FILE_RELEASES=true \
       PATH="$target_home/bin:$runtime_path" \
       "$target_home/bin/bumpster" --update 2>&1
@@ -661,7 +676,7 @@ test_self_update_rejects_downgrade() {
 
   if output="$(
     HOME="$home_dir" \
-      BUMPSTER_RELEASE_DOWNLOAD_URL="file://$release_090" \
+      BUMPSTER_RELEASE_DOWNLOAD_URL="$(release_url_for_directory "$release_090")" \
       BUMPSTER_TEST_ALLOW_FILE_RELEASES=true \
       PATH="$target_home/bin:$runtime_path" \
       "$target_home/bin/bumpster" --update 2>&1
