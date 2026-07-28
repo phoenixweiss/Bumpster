@@ -6,6 +6,27 @@ export LC_ALL=C.UTF-8
 source "$(dirname "$0")/config.sh"
 source "$(dirname "$0")/lib/functions.sh"
 
+run_update_command() {
+  # BUMPSTER_HOME is initialized by the sourced config in the current shell.
+  # shellcheck disable=SC2031
+  local update_home="$BUMPSTER_HOME"
+
+  # Replacing the CLI process releases Windows handles before the runtime rename.
+  # The single-quoted script must expand variables only in the new Bash process.
+  # shellcheck disable=SC2016,SC2093
+  exec env BUMPSTER_HOME="$update_home" "$BASH" -c '
+    runtime_home="$1"
+
+    cd "$(dirname "$runtime_home")" || exit 1
+    source "$runtime_home/config.sh" || exit 1
+    source "$runtime_home/lib/functions.sh" || exit 1
+    update_bumpster
+  ' bumpster-update "$update_home"
+
+  log "Could not start the isolated update process." "ERROR"
+  return 1
+}
+
 # Process command-line options
 version_type=""
 create_local_config=""
@@ -18,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     -M | --major )                  version_type="major" ;;
     -m | --minor )                  version_type="minor" ;;
     -p | --patch )                  version_type="patch" ;;
-    -u | --update )                 update_bumpster ; exit $? ;;
+    -u | --update )                 run_update_command ; exit $? ;;
     -s | --status )                 check_status ; exit 0 ;;
     -l | --create-local-config )    create_local_config="true" ;;
     -f | --create-feature )         create_feature_branch="true" ;;
