@@ -435,7 +435,12 @@ workflow, который публикует GitHub Release только посл
 runtime-архив из помеченного тегом коммита, проверяет его checksum и точный
 состав, генерирует SLSA build provenance и загружает в draft Release только
 архив и `SHA256SUMS`. Release становится публичным и latest только после
-проверки его assets.
+проверки его assets. После публикации отдельный matrix smoke-тест скачивает
+публичный latest Release в Linux, macOS и Windows/Git Bash; он проверяет
+checksum и attestation, чистую установку, миграцию с `v0.8.0`, безопасные
+CLI-команды, no-op self-update и whitelist установленных файлов. Этот же
+smoke workflow можно запустить вручную; по периодическому расписанию он не
+выполняется.
 
 После загрузки обоих runtime assets проверить checksum и GitHub artifact
 attestation можно командами:

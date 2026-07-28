@@ -290,3 +290,13 @@ jobs:
               --jq '.html_url'
           )"
           printf 'Release publication failed. Draft retained: %s\n' "$draft_url"
+
+  smoke:
+    name: Verify public Release
+    needs: publish
+    permissions:
+      attestations: read
+      contents: read
+    uses: ./.github/workflows/release-smoke.yml
+    with:
+      expected_tag: ${{ github.ref_name }}

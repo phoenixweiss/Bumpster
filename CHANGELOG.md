@@ -9,6 +9,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Cross-platform public Release smoke tests for checksum, provenance, runtime
+  contents, clean installation, migration from `v0.8.0`, and no-op self-update.
+- Automatic public smoke verification after each published Release, plus a
+  manual GitHub Actions entry point without recurring scheduled runs.
+
 ## [0.9.0] - 2026-07-28
 
 ### Added

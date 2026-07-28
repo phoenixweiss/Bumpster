@@ -436,7 +436,11 @@ required checks pass. Starting with `0.9.0`, the workflow builds the runtime
 archive from the tagged commit, verifies its checksum and exact contents,
 generates SLSA build provenance, and uploads only the archive and `SHA256SUMS` to
 a draft Release. The Release becomes public and latest only after its assets
-have been verified.
+have been verified. After publication, a separate matrix smoke test downloads
+the public latest Release on Linux, macOS, and Windows/Git Bash; it verifies the
+checksum and attestation, clean installation, migration from `v0.8.0`, safe CLI
+commands, no-op self-update, and the installed file whitelist. The same smoke
+workflow can be started manually and does not run on a recurring schedule.
 
 After downloading both runtime assets, verify the checksum and the GitHub
 artifact attestation with:
