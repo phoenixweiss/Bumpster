@@ -42,7 +42,8 @@ This installs Bumpster in your home directory under `~/.bumpster`.
 The installer downloads only the runtime archive and `SHA256SUMS` from the
 latest stable GitHub Release. It verifies the checksum, exact archive contents,
 regular-file structure, embedded version, and a CLI smoke test before changing
-the installation directory. `curl`, `tar`, and `shasum` are required.
+the installation directory. `curl`, `tar`, and either `shasum` or `sha256sum`
+are required.
 
 After installation, add Bumpster to your PATH:
 
@@ -441,7 +442,11 @@ After downloading both runtime assets, verify the checksum and the GitHub
 artifact attestation with:
 
 ```bash
-shasum -a 256 -c SHA256SUMS
+if command -v shasum >/dev/null 2>&1; then
+  shasum -a 256 -c SHA256SUMS
+else
+  sha256sum -c SHA256SUMS
+fi
 gh attestation verify bumpster-X.Y.Z.tar.gz --repo phoenixweiss/Bumpster
 ```
 

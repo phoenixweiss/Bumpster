@@ -16,6 +16,7 @@ previous_moved=false
 new_runtime_moved=false
 installation_complete=false
 create_bump_wrapper=false
+sha256_command=""
 
 log() {
   printf '%s\n' "$*"
@@ -97,12 +98,37 @@ require_commands() {
   local command_name
 
   for command_name in \
-    awk basename chmod cp curl dirname mktemp mkdir mv rm rmdir shasum tar; do
+    awk basename chmod cp curl dirname mktemp mkdir mv rm rmdir tar; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
       fail "$command_name is required."
       return 1
     fi
   done
+
+  if command -v shasum >/dev/null 2>&1; then
+    sha256_command="shasum"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256_command="sha256sum"
+  else
+    fail "shasum or sha256sum is required."
+    return 1
+  fi
+}
+
+calculate_sha256() {
+  local file_path="$1"
+
+  case "$sha256_command" in
+    shasum)
+      shasum -a 256 "$file_path" | awk '{print $1}'
+      ;;
+    sha256sum)
+      sha256sum "$file_path" | awk '{print $1}'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 resolve_target_home() {
@@ -227,7 +253,7 @@ verify_release_archive() {
   local runtime_file
   local runtime_version_output
 
-  actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')" ||
+  actual_checksum="$(calculate_sha256 "$archive_path")" ||
     return 1
   if [[ "$actual_checksum" != "$release_checksum" ]]; then
     fail "Runtime archive checksum mismatch."

@@ -396,6 +396,22 @@ runtime_download_file() {
     "$url"
 }
 
+runtime_calculate_sha256() {
+  local file_path="$1"
+
+  case "$runtime_sha256_command" in
+    shasum)
+      shasum -a 256 "$file_path" | awk '{print $1}'
+      ;;
+    sha256sum)
+      sha256sum "$file_path" | awk '{print $1}'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 runtime_parse_release_checksum() {
   local checksum_path="$1"
   local checksum_line
@@ -419,7 +435,7 @@ runtime_verify_release_archive() {
   local runtime_file
   local version_output
 
-  actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')" ||
+  actual_checksum="$(runtime_calculate_sha256 "$archive_path")" ||
     return 1
   if [[ "$actual_checksum" != "$runtime_release_checksum" ]]; then
     log "Runtime archive checksum mismatch." "ERROR"
@@ -591,6 +607,7 @@ update_bumpster() (
   local existing_bump=""
   local existing_bump_parent=""
   local physical_existing_bump=""
+  local runtime_sha256_command=""
 
   runtime_target_parent=""
   runtime_target_name=""
@@ -611,12 +628,20 @@ update_bumpster() (
   trap 'exit 143' TERM
 
   for required_command in \
-    awk basename chmod cp curl dirname mktemp mkdir mv rm rmdir shasum tar; do
+    awk basename chmod cp curl dirname mktemp mkdir mv rm rmdir tar; do
     if ! command -v "$required_command" >/dev/null 2>&1; then
       log "$required_command is required for updates." "ERROR"
       return 1
     fi
   done
+  if command -v shasum >/dev/null 2>&1; then
+    runtime_sha256_command="shasum"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    runtime_sha256_command="sha256sum"
+  else
+    log "shasum or sha256sum is required for updates." "ERROR"
+    return 1
+  fi
 
   runtime_resolve_update_home || return 1
   case "$release_download_url" in

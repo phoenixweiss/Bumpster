@@ -7,6 +7,7 @@ suite_root=""
 runtime_path="/usr/bin:/bin:/usr/sbin:/sbin"
 passed=0
 failed=0
+sha256_command=""
 
 cleanup() {
   if [[ "${KEEP_TEST_TMP:-false}" == "true" ]]; then
@@ -45,6 +46,22 @@ assert_contains() {
   if [[ "$haystack" != *"$needle"* ]]; then
     fail "$message (missing: '$needle')"
   fi
+}
+
+calculate_sha256() {
+  local file_path="$1"
+
+  case "$sha256_command" in
+    shasum)
+      shasum -a 256 "$file_path" | awk '{print $1}'
+      ;;
+    sha256sum)
+      sha256sum "$file_path" | awk '{print $1}'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 create_release_fixture() {
@@ -101,10 +118,7 @@ create_release_fixture() {
     -- "${runtime_files[@]}" |
     gzip -n -9 > "$release_dir/$archive_name" || return 1
 
-  checksum="$(
-    shasum -a 256 "$release_dir/$archive_name" |
-      awk '{print $1}'
-  )" || return 1
+  checksum="$(calculate_sha256 "$release_dir/$archive_name")" || return 1
   printf '%s  %s\n' "$checksum" "$archive_name" \
     > "$release_dir/SHA256SUMS" || return 1
 
@@ -685,6 +699,15 @@ run_test() {
 }
 
 main() {
+  if command -v shasum >/dev/null 2>&1; then
+    sha256_command="shasum"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256_command="sha256sum"
+  else
+    fail "shasum or sha256sum is required for install tests"
+    return 1
+  fi
+
   suite_root="$(
     mktemp -d "${TMPDIR:-/tmp}/bumpster-install-tests.XXXXXX"
   )" || return 1

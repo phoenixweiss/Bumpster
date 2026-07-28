@@ -42,7 +42,8 @@
 Installer загружает только runtime-архив и `SHA256SUMS` из последнего
 стабильного GitHub Release. До изменения директории установки он проверяет
 checksum, точный состав архива, типы файлов, встроенную версию и выполняет
-smoke-тест CLI. Требуются `curl`, `tar` и `shasum`.
+smoke-тест CLI. Требуются `curl`, `tar` и одна из команд: `shasum` или
+`sha256sum`.
 
 После установки добавьте Bumpster в PATH:
 
@@ -440,7 +441,11 @@ runtime-архив из помеченного тегом коммита, про
 attestation можно командами:
 
 ```bash
-shasum -a 256 -c SHA256SUMS
+if command -v shasum >/dev/null 2>&1; then
+  shasum -a 256 -c SHA256SUMS
+else
+  sha256sum -c SHA256SUMS
+fi
 gh attestation verify bumpster-X.Y.Z.tar.gz --repo phoenixweiss/Bumpster
 ```
 

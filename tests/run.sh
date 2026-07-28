@@ -13,6 +13,7 @@ cli_status=0
 test_path="$PATH"
 passed=0
 failed=0
+sha256_command=""
 
 cleanup() {
   if [[ "${KEEP_TEST_TMP:-false}" == "true" ]]; then
@@ -82,6 +83,22 @@ assert_command_succeeds() {
   if ! "$@"; then
     fail "$message"
   fi
+}
+
+calculate_sha256() {
+  local file_path="$1"
+
+  case "$sha256_command" in
+    shasum)
+      shasum -a 256 "$file_path" | awk '{print $1}'
+      ;;
+    sha256sum)
+      sha256sum "$file_path" | awk '{print $1}'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 create_fixture() {
@@ -274,6 +291,8 @@ test_runtime_archive_is_reproducible_and_minimal() {
   local archive_two
   local expected_entries
   local actual_entries
+  local actual_checksum
+  local expected_checksum
   local extract_dir="$suite_root/runtime-extract"
   local runtime_root
   local version_output
@@ -290,10 +309,11 @@ test_runtime_archive_is_reproducible_and_minimal() {
 
   assert_command_succeeds "Repeated runtime builds are not byte-for-byte reproducible" \
     cmp -s "$archive_one" "$archive_two" || return 1
-  (
-    cd "$output_one" &&
-      shasum -a 256 -c SHA256SUMS >/dev/null
-  ) || fail "Runtime checksum verification failed" || return 1
+  expected_checksum="$(awk '{print $1}' "$output_one/SHA256SUMS")" ||
+    return 1
+  actual_checksum="$(calculate_sha256 "$archive_one")" || return 1
+  assert_equal "$expected_checksum" "$actual_checksum" \
+    "Runtime checksum verification failed" || return 1
 
   expected_entries="$(
     printf '%s\n' \
@@ -1088,6 +1108,15 @@ run_test() {
 
 main() {
   local node_binary=""
+
+  if command -v shasum >/dev/null 2>&1; then
+    sha256_command="shasum"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256_command="sha256sum"
+  else
+    fail "shasum or sha256sum is required for integration tests"
+    return 1
+  fi
 
   node_binary="$(command -v node 2>/dev/null || true)"
   if command -v asdf >/dev/null 2>&1; then

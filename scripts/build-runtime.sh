@@ -22,6 +22,7 @@ checksum_path=""
 temporary_archive=""
 temporary_checksum=""
 published_archive=false
+sha256_command=""
 
 cleanup() {
   if [[ -n "$temporary_archive" && -f "$temporary_archive" ]]; then
@@ -48,12 +49,36 @@ if [[ -z "$output_argument" ]]; then
   exit 2
 fi
 
-for required_command in git gzip mktemp shasum awk; do
+for required_command in git gzip mktemp awk; do
   if ! command -v "$required_command" >/dev/null 2>&1; then
     printf '%s is required to build the runtime archive.\n' "$required_command" >&2
     exit 1
   fi
 done
+if command -v shasum >/dev/null 2>&1; then
+  sha256_command="shasum"
+elif command -v sha256sum >/dev/null 2>&1; then
+  sha256_command="sha256sum"
+else
+  printf 'shasum or sha256sum is required to build the runtime archive.\n' >&2
+  exit 1
+fi
+
+calculate_sha256() {
+  local file_path="$1"
+
+  case "$sha256_command" in
+    shasum)
+      shasum -a 256 "$file_path" | awk '{print $1}'
+      ;;
+    sha256sum)
+      sha256sum "$file_path" | awk '{print $1}'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 if ! resolved_ref="$(git -C "$project_root" rev-parse --verify "$source_ref^{commit}" 2>/dev/null)"; then
   printf 'Git ref does not resolve to a commit: %s\n' "$source_ref" >&2
@@ -117,7 +142,10 @@ if ! git -C "$project_root" archive \
   exit 1
 fi
 
-archive_checksum="$(shasum -a 256 "$temporary_archive" | awk '{print $1}')"
+archive_checksum="$(calculate_sha256 "$temporary_archive")" || {
+  printf 'Failed to calculate the runtime archive checksum.\n' >&2
+  exit 1
+}
 if [[ ! "$archive_checksum" =~ ^[0-9a-f]{64}$ ]]; then
   printf 'Failed to calculate the runtime archive checksum.\n' >&2
   exit 1
