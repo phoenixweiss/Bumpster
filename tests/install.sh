@@ -48,6 +48,24 @@ assert_contains() {
   fi
 }
 
+add_command_directory_to_runtime_path() {
+  local command_name="$1"
+  local command_path
+  local command_dir
+
+  command_path="$(command -v "$command_name" 2>/dev/null)" ||
+    fail "$command_name is required for install tests" || return 1
+  command_dir="$(dirname "$command_path")" || return 1
+
+  case ":$runtime_path:" in
+    *":$command_dir:"*)
+      ;;
+    *)
+      runtime_path="$command_dir:$runtime_path"
+      ;;
+  esac
+}
+
 calculate_sha256() {
   local file_path="$1"
 
@@ -707,6 +725,8 @@ main() {
     fail "shasum or sha256sum is required for install tests"
     return 1
   fi
+  add_command_directory_to_runtime_path "$sha256_command" || return 1
+  add_command_directory_to_runtime_path curl || return 1
 
   suite_root="$(
     mktemp -d "${TMPDIR:-/tmp}/bumpster-install-tests.XXXXXX"
