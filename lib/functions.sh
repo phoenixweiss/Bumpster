@@ -310,115 +310,434 @@ load_config() {
   fi
 }
 
+# Write one command wrapper atomically.
+write_command_wrapper() {
+  local wrapper_path="$1"
+  local temporary_wrapper
+
+  temporary_wrapper="$(mktemp "$bin_dir/.wrapper.XXXXXX")" || return 1
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'BUMPSTER_HOME=%q\n' "$BUMPSTER_HOME"
+    printf 'export BUMPSTER_HOME\n'
+    # The generated wrapper must contain the literal runtime variable references.
+    # shellcheck disable=SC2016
+    printf 'exec "$BUMPSTER_HOME/bumpster.sh" "$@"\n'
+  } > "$temporary_wrapper" || return 1
+  chmod +x "$temporary_wrapper" || return 1
+  mv "$temporary_wrapper" "$wrapper_path"
+}
+
 # Function to perform post-installation steps
 post_install() {
-
-  # Log the post-installation process
   log "Performing post-installation steps"
 
-  # Make the main script executable
-  log "Setting executable permissions for bumpster.sh"
-  # Check if chmod was successful
   if ! chmod +x "$BUMPSTER_HOME/bumpster.sh"; then
-    log "Failed to set executable permissions for bumpster.sh" "WARN"
-    echo "Please manually set the execution permissions:"
-    echo "  chmod +x $BUMPSTER_HOME/bumpster.sh"
-  else
-    log "Executable permissions successfully set for bumpster.sh"
+    log "Failed to make bumpster.sh executable." "ERROR"
+    return 1
+  fi
+  if ! mkdir -p "$bin_dir"; then
+    log "Failed to create the command directory." "ERROR"
+    return 1
+  fi
+  if ! write_command_wrapper "$bin_dir/bumpster"; then
+    log "Failed to create the bumpster wrapper." "ERROR"
+    return 1
   fi
 
-  # Create the bin directory if it doesn't exist
-  mkdir -p "$bin_dir"
-
-  # Create the wrapper script in bin_dir
-  cat > "$bin_dir/bumpster" <<EOF
-#!/bin/bash
-"\$HOME/.bumpster/bumpster.sh" "\$@"
-EOF
-
-  # Make the wrapper script executable
-  chmod +x "$bin_dir/bumpster"
-
-  # Optionally create the 'bump' wrapper
-  if [[ "$create_bump_wrapper" == "true" ]]; then
-    log "Creating 'bump' wrapper for 'bumpster'."
-    bump_wrapper="$bin_dir/bump"
-    cat > "$bump_wrapper" <<EOF
-#!/bin/bash
-"\$HOME/.bumpster/bumpster.sh" "\$@"
-EOF
-    chmod +x "$bump_wrapper"
-    log "'bump' wrapper created at $bump_wrapper."
+  if [[ "${create_bump_wrapper:-false}" == "true" ]]; then
+    if ! write_command_wrapper "$bin_dir/bump"; then
+      log "Failed to create the bump wrapper." "ERROR"
+      return 1
+    fi
+    log "'bump' wrapper created at $bin_dir/bump."
   else
-    log "'bump' command is already in use. Wrapper not created."
+    log "The command 'bump' is already in use. Wrapper not created."
   fi
-
 }
 
-# Function to update Bumpster to the latest version
-update_bumpster() {
-  local remote_version
-  local local_version
+runtime_version_is_greater() {
+  local candidate="$1"
+  local reference="$2"
+  local candidate_major candidate_minor candidate_patch
+  local reference_major reference_minor reference_patch
 
-  # Check if VERSION file exists
-  if [ -f "$local_version_file" ]; then
-    local_version=$(cat "$local_version_file")
-  else
-    log "Local version information not available."
-    local_version="0.0.0"
+  IFS=. read -r candidate_major candidate_minor candidate_patch <<< "$candidate"
+  IFS=. read -r reference_major reference_minor reference_patch <<< "$reference"
+
+  if ((candidate_major != reference_major)); then
+    ((candidate_major > reference_major))
+    return
+  fi
+  if ((candidate_minor != reference_minor)); then
+    ((candidate_minor > reference_minor))
+    return
+  fi
+  ((candidate_patch > reference_patch))
+}
+
+runtime_download_file() {
+  local url="$1"
+  local output_path="$2"
+  local protocol="=https"
+
+  if [[ "$url" == file://* ]]; then
+    protocol="=file"
   fi
 
-  # Fetch the remote version
-  if ! remote_version=$(curl -s "$remote_version_file"); then
-    log "Failed to fetch remote version information from $remote_version_file." "WARN"
+  curl \
+    --disable \
+    --fail \
+    --silent \
+    --show-error \
+    --location \
+    --proto "$protocol" \
+    --output "$output_path" \
+    "$url"
+}
+
+runtime_parse_release_checksum() {
+  local checksum_path="$1"
+  local checksum_line
+
+  checksum_line="$(<"$checksum_path")" || return 1
+  if [[ ! "$checksum_line" =~ ^([0-9a-f]{64})[[:space:]][[:space:]](bumpster-((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))\.tar\.gz)$ ]]; then
+    log "SHA256SUMS does not contain one valid Bumpster runtime asset." "ERROR"
     return 1
   fi
-  if [[ -z "$remote_version" ]]; then
-    log "Remote version information is empty. Skipping update." "WARN"
+
+  runtime_release_checksum="${BASH_REMATCH[1]}"
+  runtime_archive_name="${BASH_REMATCH[2]}"
+  runtime_release_version="${BASH_REMATCH[3]}"
+}
+
+runtime_verify_release_archive() {
+  local archive_path="$1"
+  local actual_checksum
+  local expected_entries
+  local actual_entries
+  local runtime_file
+  local version_output
+
+  actual_checksum="$(shasum -a 256 "$archive_path" | awk '{print $1}')" ||
+    return 1
+  if [[ "$actual_checksum" != "$runtime_release_checksum" ]]; then
+    log "Runtime archive checksum mismatch." "ERROR"
     return 1
   fi
 
-  # Compare versions
-  if [ "$local_version" != "$remote_version" ]; then
-    log "Updating Bumpster from version $local_version to $remote_version..."
+  expected_entries="$(
+    printf '%s\n' \
+      "bumpster-$runtime_release_version/" \
+      "bumpster-$runtime_release_version/LICENSE" \
+      "bumpster-$runtime_release_version/VERSION" \
+      "bumpster-$runtime_release_version/bumpster.sh" \
+      "bumpster-$runtime_release_version/config.sh" \
+      "bumpster-$runtime_release_version/lib/" \
+      "bumpster-$runtime_release_version/lib/BUMPSTER_LOGO.ASCII" \
+      "bumpster-$runtime_release_version/lib/functions.sh"
+  )"
+  actual_entries="$(tar -tzf "$archive_path")" || {
+    log "Could not read the runtime archive." "ERROR"
+    return 1
+  }
+  if [[ "$actual_entries" != "$expected_entries" ]]; then
+    log "Runtime archive contents do not match the whitelist." "ERROR"
+    return 1
+  fi
 
-    # Create a backup
-    local backup_dir="$BUMPSTER_HOME.backup.$local_version"
-    if ! cp -r "$BUMPSTER_HOME" "$backup_dir"; then
-      abort "Failed to create backup in $backup_dir."
+  if ! tar -xzf "$archive_path" -C "$runtime_temporary_root"; then
+    log "Could not extract the runtime archive." "ERROR"
+    return 1
+  fi
+  runtime_staged_home="$runtime_temporary_root/bumpster-$runtime_release_version"
+
+  if [[ ! -d "$runtime_staged_home" || -L "$runtime_staged_home" ||
+    ! -d "$runtime_staged_home/lib" || -L "$runtime_staged_home/lib" ]]; then
+    log "Runtime archive directory structure is unsafe." "ERROR"
+    return 1
+  fi
+  for runtime_file in \
+    LICENSE VERSION bumpster.sh config.sh \
+    lib/BUMPSTER_LOGO.ASCII lib/functions.sh; do
+    if [[ ! -f "$runtime_staged_home/$runtime_file" ||
+      -L "$runtime_staged_home/$runtime_file" ]]; then
+      log "Runtime archive contains an unsafe file: $runtime_file" "ERROR"
+      return 1
     fi
-    log "Backup created at $backup_dir."
+  done
+  if [[ "$(<"$runtime_staged_home/VERSION")" != "$runtime_release_version" ]]; then
+    log "Runtime VERSION does not match the Release asset." "ERROR"
+    return 1
+  fi
 
-    # Download and extract the latest version to a temporary directory
-    local temp_dir
-    temp_dir=$(mktemp -d)
-    if ! curl -L -# "$version_url" | tar -zxf - --strip-components 1 -C "$temp_dir"; then
-      abort "Failed to download and extract the latest Bumpster archive."
+  version_output="$(
+    HOME="$HOME" \
+      BUMPSTER_HOME="$runtime_staged_home" \
+      bash "$runtime_staged_home/bumpster.sh" --version
+  )" || {
+    log "Packaged Bumpster failed its version smoke test." "ERROR"
+    return 1
+  }
+  if [[ "$version_output" != "Bumpster version: $runtime_release_version" ]]; then
+    log "Packaged Bumpster reported an unexpected version." "ERROR"
+    return 1
+  fi
+}
+
+runtime_remove_temporary_root() {
+  local temporary_name
+
+  if [[ -z "$runtime_temporary_root" || ! -e "$runtime_temporary_root" ]]; then
+    return
+  fi
+  if [[ "$(dirname "$runtime_temporary_root")" != "$runtime_target_parent" ]]; then
+    log "Refusing to remove unexpected temporary path: $runtime_temporary_root" "ERROR"
+    return
+  fi
+
+  temporary_name="$(basename "$runtime_temporary_root")"
+  case "$temporary_name" in
+    ".$runtime_target_name.update."*)
+      rm -rf -- "$runtime_temporary_root"
+      ;;
+    *)
+      log "Refusing to remove unexpected temporary path: $runtime_temporary_root" "ERROR"
+      ;;
+  esac
+}
+
+runtime_rollback_update() {
+  local failed_runtime=""
+
+  if [[ "$runtime_update_complete" == "true" ]]; then
+    return
+  fi
+
+  if [[ "$runtime_new_moved" == "true" && -e "$runtime_target_home" ]]; then
+    failed_runtime="$runtime_temporary_root/failed-runtime"
+    if ! mv "$runtime_target_home" "$failed_runtime"; then
+      log "Could not move the failed runtime away from $runtime_target_home." "ERROR"
+      return
     fi
+    runtime_new_moved=false
+  fi
 
-    # Replace the old files with the new ones
-    rm -rf "$BUMPSTER_HOME"
-    mv "$temp_dir" "$BUMPSTER_HOME"
-
-    # Check if 'bump' command is already in use
-    if command -v bump &>/dev/null; then
-      log "The command 'bump' is already in use. Wrapper for 'bumpster' will not be created during update."
-      create_bump_wrapper="false"
+  if [[ "$runtime_previous_moved" == "true" &&
+    -d "$runtime_previous_home" ]]; then
+    if mv "$runtime_previous_home" "$runtime_target_home"; then
+      runtime_previous_moved=false
+      rmdir "$runtime_backup_dir" 2>/dev/null || true
+      runtime_backup_dir=""
+      log "Previous Bumpster installation restored." "WARN"
     else
-      create_bump_wrapper="true"
+      log "Automatic rollback failed. Previous installation remains at $runtime_previous_home." "ERROR"
     fi
-
-    # Pass the variable to post_install
-    export create_bump_wrapper
-
-    # Perform post-installation steps
-    post_install
-
-    log "Bumpster updated to version $remote_version."
-  else
-    log "You are already using the latest version ($local_version)."
   fi
 }
+
+runtime_update_cleanup() {
+  runtime_rollback_update
+  if [[ "$runtime_update_complete" != "true" &&
+    -n "$runtime_backup_dir" && -d "$runtime_backup_dir" ]]; then
+    rmdir "$runtime_backup_dir" 2>/dev/null || true
+  fi
+  runtime_remove_temporary_root
+}
+
+runtime_resolve_update_home() {
+  local requested_parent
+  local physical_home
+
+  if [[ -z "$BUMPSTER_HOME" || "$BUMPSTER_HOME" != /* ]]; then
+    log "BUMPSTER_HOME must be an absolute path." "ERROR"
+    return 1
+  fi
+  runtime_target_name="$(basename "$BUMPSTER_HOME")"
+  if [[ -z "$runtime_target_name" || "$runtime_target_name" == "." ||
+    "$runtime_target_name" == ".." ]]; then
+    log "BUMPSTER_HOME has an unsafe final path component." "ERROR"
+    return 1
+  fi
+
+  requested_parent="$(dirname "$BUMPSTER_HOME")"
+  if ! runtime_target_parent="$(cd "$requested_parent" && pwd -P)"; then
+    log "Could not resolve the parent directory for BUMPSTER_HOME." "ERROR"
+    return 1
+  fi
+  runtime_target_home="$runtime_target_parent/$runtime_target_name"
+  physical_home="$(cd "$HOME" && pwd -P)" || return 1
+
+  if [[ "$runtime_target_home" == "/" ||
+    "$runtime_target_home" == "$physical_home" ]]; then
+    log "Refusing to use a broad directory as BUMPSTER_HOME." "ERROR"
+    return 1
+  fi
+  if [[ -L "$runtime_target_home" || ! -d "$runtime_target_home" ]]; then
+    log "BUMPSTER_HOME must be an existing directory, not a symbolic link." "ERROR"
+    return 1
+  fi
+
+  BUMPSTER_HOME="$runtime_target_home"
+  bin_dir="$BUMPSTER_HOME/bin"
+  local_version_file="$BUMPSTER_HOME/VERSION"
+}
+
+# Function to update Bumpster to the latest stable GitHub Release.
+update_bumpster() (
+  local checksum_path
+  local archive_path
+  local local_version
+  local existing_bump=""
+  local existing_bump_parent=""
+  local physical_existing_bump=""
+
+  runtime_target_parent=""
+  runtime_target_name=""
+  runtime_target_home=""
+  runtime_temporary_root=""
+  runtime_staged_home=""
+  runtime_backup_dir=""
+  runtime_previous_home=""
+  runtime_previous_moved=false
+  runtime_new_moved=false
+  runtime_update_complete=false
+  runtime_release_checksum=""
+  runtime_archive_name=""
+  runtime_release_version=""
+
+  trap runtime_update_cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  for required_command in \
+    awk basename chmod cp curl dirname mktemp mkdir mv rm rmdir shasum tar; do
+    if ! command -v "$required_command" >/dev/null 2>&1; then
+      log "$required_command is required for updates." "ERROR"
+      return 1
+    fi
+  done
+
+  runtime_resolve_update_home || return 1
+  case "$release_download_url" in
+    https://*)
+      ;;
+    file://*)
+      if [[ "${BUMPSTER_TEST_ALLOW_FILE_RELEASES:-false}" != "true" ]]; then
+        log "Release downloads must use HTTPS." "ERROR"
+        return 1
+      fi
+      ;;
+    *)
+      log "Release downloads must use HTTPS." "ERROR"
+      return 1
+      ;;
+  esac
+
+  if [[ ! -f "$local_version_file" ]]; then
+    log "Local VERSION is missing; use the versioned installer to recover." "ERROR"
+    return 1
+  fi
+  local_version="$(<"$local_version_file")"
+  if [[ ! "$local_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    log "Local VERSION is invalid; use the versioned installer to recover." "ERROR"
+    return 1
+  fi
+
+  runtime_temporary_root="$(
+    mktemp -d "$runtime_target_parent/.$runtime_target_name.update.XXXXXX"
+  )" || {
+    log "Could not create a temporary update directory." "ERROR"
+    return 1
+  }
+  checksum_path="$runtime_temporary_root/SHA256SUMS"
+
+  if ! runtime_download_file \
+    "${release_download_url%/}/SHA256SUMS" \
+    "$checksum_path"; then
+    log "Could not download SHA256SUMS." "ERROR"
+    return 1
+  fi
+  runtime_parse_release_checksum "$checksum_path" || return 1
+
+  if [[ "$local_version" == "$runtime_release_version" ]]; then
+    log "You are already using the latest version ($local_version)."
+    runtime_update_complete=true
+    return 0
+  fi
+  if ! runtime_version_is_greater "$runtime_release_version" "$local_version"; then
+    log "Refusing to downgrade from $local_version to $runtime_release_version." "ERROR"
+    return 1
+  fi
+
+  archive_path="$runtime_temporary_root/$runtime_archive_name"
+  log "Updating Bumpster from $local_version to $runtime_release_version..."
+  if ! runtime_download_file \
+    "${release_download_url%/}/$runtime_archive_name" \
+    "$archive_path"; then
+    log "Could not download $runtime_archive_name." "ERROR"
+    return 1
+  fi
+  runtime_verify_release_archive "$archive_path" || return 1
+
+  if [[ -e "$runtime_target_home/hooks" ]]; then
+    if [[ ! -d "$runtime_target_home/hooks" ]] ||
+      ! cp -R "$runtime_target_home/hooks" "$runtime_staged_home/hooks"; then
+      log "Could not preserve user hooks." "ERROR"
+      return 1
+    fi
+  fi
+
+  existing_bump="$(command -v bump 2>/dev/null || true)"
+  if [[ "$existing_bump" == /* ]]; then
+    existing_bump_parent="$(dirname "$existing_bump")"
+    if physical_existing_bump="$(
+      cd "$existing_bump_parent" 2>/dev/null &&
+        printf '%s/%s' "$(pwd -P)" "$(basename "$existing_bump")"
+    )"; then
+      existing_bump="$physical_existing_bump"
+    fi
+  fi
+  if [[ -z "$existing_bump" ||
+    "$existing_bump" == "$runtime_target_home/bin/bump" ]]; then
+    create_bump_wrapper=true
+  else
+    create_bump_wrapper=false
+  fi
+
+  runtime_backup_dir="$(
+    mktemp -d \
+      "$runtime_target_parent/$runtime_target_name.backup.$local_version.XXXXXX"
+  )" || {
+    log "Could not create a backup directory." "ERROR"
+    return 1
+  }
+  runtime_previous_home="$runtime_backup_dir/runtime"
+  runtime_previous_moved=true
+  if ! mv "$runtime_target_home" "$runtime_previous_home"; then
+    runtime_previous_moved=false
+    log "Could not move the existing installation to $runtime_previous_home." "ERROR"
+    return 1
+  fi
+
+  runtime_new_moved=true
+  if ! mv "$runtime_staged_home" "$runtime_target_home"; then
+    runtime_new_moved=false
+    log "Could not activate the verified runtime." "ERROR"
+    return 1
+  fi
+
+  BUMPSTER_HOME="$runtime_target_home"
+  bin_dir="$BUMPSTER_HOME/bin"
+  if ! post_install; then
+    log "Could not finish the updated installation." "ERROR"
+    return 1
+  fi
+
+  runtime_update_complete=true
+  log "Bumpster updated to version $runtime_release_version."
+  log "Previous installation backup: $runtime_previous_home"
+)
 
 # Function to check repository status
 check_status() {
@@ -443,28 +762,17 @@ check_status() {
 
 # Function to show usage and version information
 usage() {
+  local local_version
+  local version_info
+
   if [ -f "$logo_file" ]; then
     cat "$logo_file"
   else
     echo "Bumpster"
   fi
 
-  # Display the local version
   local_version=$(display_version)
-
-  # Fetch the remote version
-  remote_version=$(curl -s --max-time 2 "$remote_version_file")
-
-  # Check if the remote version was successfully fetched and compare
-  if [ -n "$remote_version" ]; then
-    if [ "$local_version" != "$remote_version" ]; then
-      version_info="$local_version (a newer version $remote_version is available)"
-    else
-      version_info="$local_version"
-    fi
-  else
-    version_info="$local_version"
-  fi
+  version_info="$local_version"
 
   cat <<EOS
 Bumpster $version_info

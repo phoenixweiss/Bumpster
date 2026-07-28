@@ -43,11 +43,8 @@ master_branch=""
 develop_branch=""
 logging_enabled=""
 
-# URL to download the latest version of Bumpster
-version_url="https://github.com/phoenixweiss/Bumpster/archive/refs/heads/main.tar.gz"
-
-# Define remote version file location
-remote_version_file="https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/VERSION"
+# Latest stable GitHub Release assets
+release_download_url="${BUMPSTER_RELEASE_DOWNLOAD_URL:-https://github.com/phoenixweiss/Bumpster/releases/latest/download}"
 
 # Define version file location
 local_version_file="$BUMPSTER_HOME/VERSION"

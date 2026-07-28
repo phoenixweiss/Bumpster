@@ -18,6 +18,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   files enter the runtime archive.
 - SLSA build provenance for the runtime archive, generated with GitHub artifact
   attestations and verified before release publication.
+- Isolated install and self-update coverage for clean installation, migration
+  from `0.8.0`, repeated installation, unavailable or corrupt assets, unsafe
+  target paths, no-op and downgrade handling, and rollback after activation
+  failures.
 
 ### Changed
 
@@ -26,6 +30,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   GitHub Release.
 - The installation guide now defines a one-time migration path from the legacy
   `0.8.x` source-archive updater to the verified Release-asset scheme.
+- Installation and self-update now stage the latest stable runtime asset,
+  validate its checksum and exact structure, preserve user hooks, retain the
+  previous runtime in a collision-safe backup, and restore it after a failed
+  activation.
+
+### Fixed
+
+- Update failures now return a non-zero CLI status, and generated wrappers
+  retain custom or physically canonicalized `BUMPSTER_HOME` paths.
+- Help output no longer depends on a network request to the mutable `main`
+  branch to display the installed version.
 
 ## [0.8.5] - 2026-07-27
 

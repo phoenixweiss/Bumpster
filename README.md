@@ -39,6 +39,10 @@ Install Bumpster with a single command:
 ```
 
 This installs Bumpster in your home directory under `~/.bumpster`.
+The installer downloads only the runtime archive and `SHA256SUMS` from the
+latest stable GitHub Release. It verifies the checksum, exact archive contents,
+regular-file structure, embedded version, and a CLI smoke test before changing
+the installation directory. `curl`, `tar`, and `shasum` are required.
 
 After installation, add Bumpster to your PATH:
 
@@ -61,8 +65,8 @@ of the `main` branch and replaces the entire `~/.bumpster` directory. Do not use
 the old `bumpster --update` command for the one-time transition to `0.9.0`,
 especially if you keep custom hooks in `~/.bumpster/hooks`.
 
-The verified migration path becomes available when `v0.9.0` is released. Before
-the first transition, keep a separate copy of the existing installation:
+The verified migration path is available starting with `v0.9.0`. Before the
+first transition, keep a separate copy of the existing installation:
 
 ```bash
 backup_dir="$HOME/.bumpster-backup-$(date +%Y%m%d-%H%M%S)"
@@ -77,16 +81,19 @@ Then run the installer pinned to the first asset-based release:
 bumpster --version
 ```
 
-The `0.9.0` installer must download and verify the versioned GitHub Release
-runtime asset, preserve user hooks and configuration, and restore the previous
-installation if the transition fails. After this one-time migration, future
-`bumpster --update` operations use the same verified Release-asset scheme.
-Global `~/.bumpsterrc` and project-level `.bumpsterrc` files are outside the
-runtime directory and remain in place.
+The `0.9.0` installer downloads and verifies the versioned GitHub Release
+runtime asset in a temporary sibling directory. It preserves user hooks and
+configuration, moves the previous runtime to a uniquely named backup, and
+automatically restores it if activation or wrapper creation fails. After this
+one-time migration, future `bumpster --update` operations use the same verified
+Release-asset scheme. Global `~/.bumpsterrc` and project-level `.bumpsterrc`
+files are outside the runtime directory and remain in place.
 
-> This command is intentionally for `v0.9.0` and later. Until that Release and
-> its runtime assets exist, keep the current installation or update only with a
-> manual backup and inspection of the legacy updater's result.
+The successful migration prints the automatic backup path. Keep it until the
+new version, hooks, and configuration have been checked; it can then be removed
+manually. If `v0.9.0` and its runtime assets are not listed in
+[GitHub Releases](https://github.com/phoenixweiss/Bumpster/releases), keep the
+current installation instead of running the legacy updater.
 
 ## Usage
 
@@ -208,6 +215,12 @@ bump -u
 If `bumpster --version` reports `0.8.x`, follow
 [Migrating from 0.8.x](#migrating-from-08x) instead of running the legacy
 updater.
+
+The updater first validates the latest stable Release in a temporary sibling
+directory. It preserves `~/.bumpster/hooks`, activates the new runtime with
+rename operations, recreates the command wrappers, and retains the previous
+runtime at the backup path printed on success. Any failure after activation
+starts restores the previous installation and returns a non-zero status.
 
 ### Customizing Branch Names
 

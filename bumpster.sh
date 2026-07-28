@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
     -M | --major )                  version_type="major" ;;
     -m | --minor )                  version_type="minor" ;;
     -p | --patch )                  version_type="patch" ;;
-    -u | --update )                 update_bumpster ; exit 0 ;;
+    -u | --update )                 update_bumpster ; exit $? ;;
     -s | --status )                 check_status ; exit 0 ;;
     -l | --create-local-config )    create_local_config="true" ;;
     -f | --create-feature )         create_feature_branch="true" ;;

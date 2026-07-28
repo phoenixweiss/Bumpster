@@ -322,6 +322,10 @@ test_runtime_archive_is_reproducible_and_minimal() {
     "Packaged runtime cannot report its version"
 }
 
+test_install_and_update_suite() {
+  bash "$project_root/tests/install.sh"
+}
+
 test_clean_feature_branch_is_closed() {
   local current_branch
   local remote_feature_content
@@ -1098,6 +1102,7 @@ main() {
 
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
   run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
+  run_test "install and update flows are transactional" test_install_and_update_suite
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
   run_test "clean feature close leaves existing stash untouched" test_existing_stash_is_untouched_by_clean_feature_close
