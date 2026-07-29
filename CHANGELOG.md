@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- A canonical English CLI compatibility contract with a synchronized Russian
+  translation, covering commands, configuration, hooks, exit semantics, side
+  effects, and safety guarantees intended for `1.x`.
+- Regression coverage for the documented help/version surface and rejection of
+  ambiguous action selections.
+
+### Changed
+
+- CLI action options are now mutually exclusive and parsed before dispatch, so
+  combinations such as `--status --patch` or `--major --minor` fail without
+  mutation instead of depending on argument order.
+- Help now distinguishes the historical `GIT_MASTER_BRANCH` key as the release
+  branch and describes custom development-branch defaults precisely.
+
 ## [0.9.2] - 2026-07-29
 
 ### Added

@@ -401,6 +401,89 @@ test_cli_delegates_release_execution() {
     "CLI entry point still publishes release refs directly"
 }
 
+test_cli_help_and_version_contract() {
+  local expected_version
+  local expected_entry
+  local expected_entries=(
+    "Usage:  bumpster [action]"
+    "Choose only one action per invocation."
+    "-h, --help"
+    "-M, --major"
+    "-m, --minor"
+    "-p, --patch"
+    "-u, --update"
+    "-v, --version"
+    "-s, --status"
+    "-l, --create-local-config"
+    "-f, --create-feature"
+    "-c, --close-feature"
+    "GIT_MASTER_BRANCH"
+    "GIT_DEVELOP_BRANCH"
+    "ENABLE_LOGGING"
+    "LOG_FILE"
+    "DELETE_FEATURE_BRANCH_AFTER_MERGE"
+    "ASK_BEFORE_DELETING_FEATURE_BRANCH"
+    "SYNC_WITH_PACKAGE_JSON"
+    "AFTER_BUMP_BRANCH"
+    "BEFORE_BUMP_BRANCH"
+  )
+
+  create_fixture "cli-help-contract" || return 1
+  run_bumpster --help
+
+  assert_equal "0" "$cli_status" "Help command failed: $cli_output" || return 1
+  for expected_entry in "${expected_entries[@]}"; do
+    assert_contains "$cli_output" "$expected_entry" \
+      "Help is missing the public contract entry" || return 1
+  done
+
+  expected_version="$(<"$project_root/VERSION")" || return 1
+  run_bumpster --version
+
+  assert_equal "0" "$cli_status" "Version command failed: $cli_output" ||
+    return 1
+  assert_equal "Bumpster version: $expected_version" "$cli_output" \
+    "Version output does not match VERSION"
+}
+
+test_cli_rejects_ambiguous_actions_without_mutation() {
+  local combination
+  local initial_head
+  local initial_version
+  local options=()
+  local combinations=(
+    "--status --version"
+    "--version --status"
+    "--major --minor"
+    "--patch --status"
+  )
+
+  create_fixture "cli-ambiguous-actions" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+  initial_version="$(<"$fixture_worktree/VERSION")" || return 1
+
+  for combination in "${combinations[@]}"; do
+    read -r -a options <<< "$combination"
+    run_bumpster "${options[@]}"
+
+    [[ "$cli_status" -ne 0 ]] ||
+      fail "Ambiguous action selection unexpectedly succeeded: $combination" ||
+      return 1
+    assert_contains "$cli_output" \
+      "Only one action option can be used at a time:" \
+      "Ambiguous action failure is unclear" || return 1
+    assert_release_state_unchanged "$initial_head" "$initial_version" ||
+      return 1
+  done
+
+  run_bumpster --not-a-bumpster-action
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Unknown action unexpectedly succeeded" || return 1
+  assert_contains "$cli_output" "Unknown option: '--not-a-bumpster-action'" \
+    "Unknown action failure is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "$initial_version"
+}
+
 test_install_and_update_suite() {
   bash "$project_root/tests/install.sh"
 }
@@ -1622,6 +1705,8 @@ main() {
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
   run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
   run_test "CLI delegates release execution to the release functions" test_cli_delegates_release_execution
+  run_test "CLI help and version expose the stable contract" test_cli_help_and_version_contract
+  run_test "CLI rejects ambiguous actions without mutation" test_cli_rejects_ambiguous_actions_without_mutation
   run_test "install and update flows are transactional" test_install_and_update_suite
   run_test "status uses the default branch configuration" test_status_uses_default_configuration
   run_test "status uses local custom branch configuration" test_status_uses_local_branch_configuration

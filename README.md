@@ -102,6 +102,10 @@ manually. The pinned installer and its runtime assets remain available in the
 
 ## Usage
 
+The public commands, configuration keys, hooks, exit semantics, and safety
+guarantees are defined in the
+[CLI compatibility contract](docs/CLI_CONTRACT.md).
+
 ### Release Pre-flight Checks
 
 Before running `--major`, `--minor`, `--patch`, or the interactive release flow:

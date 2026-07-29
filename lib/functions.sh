@@ -853,7 +853,10 @@ usage() {
 
   cat <<EOS
 Bumpster $version_info
-Usage:  bumpster [options]
+Usage:  bumpster [action]
+        Run without an action to select a release type interactively.
+        Choose only one action per invocation.
+
         -h, --help                   Show this help message
         -M, --major                  Bump major version
         -m, --minor                  Bump minor version
@@ -866,15 +869,15 @@ Usage:  bumpster [options]
         -c, --close-feature          Close the current feature branch
 
 Configuration options:
-  GIT_MASTER_BRANCH                   Name of the master branch (default: main)
+  GIT_MASTER_BRANCH                   Name of the release branch (default: main)
   GIT_DEVELOP_BRANCH                  Name of the development branch (default: dev)
   ENABLE_LOGGING                      Enable or disable logging (default: false)
   LOG_FILE                            Path to the log file (default: bumpster.log)
   DELETE_FEATURE_BRANCH_AFTER_MERGE   Automatically delete feature branches after merge (default: false)
   ASK_BEFORE_DELETING_FEATURE_BRANCH  Ask before deleting feature branches (default: true)
   SYNC_WITH_PACKAGE_JSON              Synchronize VERSION file with package.json (default: false)
-  AFTER_BUMP_BRANCH                   Branch to switch to after bumping version (default: dev)
-  BEFORE_BUMP_BRANCH                  Branch that must be checked out before bumping version (default: dev)
+  AFTER_BUMP_BRANCH                   Branch to return to (default: configured development branch)
+  BEFORE_BUMP_BRANCH                  Required release start branch (default: configured development branch)
 EOS
   exit "${1:-0}"
 }

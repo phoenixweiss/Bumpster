@@ -29,64 +29,108 @@ run_update_command() {
   return 1
 }
 
+select_cli_command() {
+  local command_name="$1"
+  local option_name="$2"
+
+  if [[ -n "$selected_command" ]]; then
+    printf "Only one action option can be used at a time: '%s' and '%s'.\n" \
+      "$selected_option" "$option_name" >&2
+    usage 1
+  fi
+
+  selected_command="$command_name"
+  selected_option="$option_name"
+}
+
 # Process command-line options
 version_type=""
-create_local_config=""
-create_feature_branch=""
-close_feature_branch=""
-show_status=""
+selected_command=""
+selected_option=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)                    usage ;;
-    -v | --version)                 echo "Bumpster version: $(display_version)" ; exit 0 ;;
-    -M | --major )                  version_type="major" ;;
-    -m | --minor )                  version_type="minor" ;;
-    -p | --patch )                  version_type="patch" ;;
-    -u | --update )                 run_update_command ; exit $? ;;
-    -s | --status )                 show_status="true" ;;
-    -l | --create-local-config )    create_local_config="true" ;;
-    -f | --create-feature )         create_feature_branch="true" ;;
-    -c | --close-feature )          close_feature_branch="true" ;;
+    -h | --help)
+      select_cli_command "help" "$1"
+      ;;
+    -v | --version)
+      select_cli_command "version" "$1"
+      ;;
+    -M | --major)
+      select_cli_command "release" "$1"
+      version_type="major"
+      ;;
+    -m | --minor)
+      select_cli_command "release" "$1"
+      version_type="minor"
+      ;;
+    -p | --patch)
+      select_cli_command "release" "$1"
+      version_type="patch"
+      ;;
+    -u | --update)
+      select_cli_command "update" "$1"
+      ;;
+    -s | --status)
+      select_cli_command "status" "$1"
+      ;;
+    -l | --create-local-config)
+      select_cli_command "create-local-config" "$1"
+      ;;
+    -f | --create-feature)
+      select_cli_command "create-feature" "$1"
+      ;;
+    -c | --close-feature)
+      select_cli_command "close-feature" "$1"
+      ;;
     *)                              printf "Unknown option: '%s'\n" "$1" >&2
     usage 1 ;;
   esac
   shift
 done
 
+case "$selected_command" in
+  help)
+    usage
+    ;;
+  version)
+    printf 'Bumpster version: %s\n' "$(display_version)"
+    exit 0
+    ;;
+  update)
+    run_update_command
+    exit $?
+    ;;
+esac
+
 # Preload configuration for commands that depend on configured branch names
-if [[ "$close_feature_branch" == "true" ||
-  "$create_feature_branch" == "true" ||
-  "$show_status" == "true" ]]; then
-  if [ -f "$local_config_file" ]; then
-    load_config "$local_config_file"
-  elif [ -f "$global_config_file" ]; then
-    load_config "$global_config_file"
-  fi
-fi
+case "$selected_command" in
+  status | create-feature | close-feature)
+    if [ -f "$local_config_file" ]; then
+      load_config "$local_config_file"
+    elif [ -f "$global_config_file" ]; then
+      load_config "$global_config_file"
+    fi
+    ;;
+esac
 
-# Show repository status if the option was passed
-if [[ "$show_status" == "true" ]]; then
-  check_status
-  exit $?
-fi
-
-# Close a feature branch if the option was passed
-if [[ "$close_feature_branch" == "true" ]]; then
-  close_feature
-  exit 0
-fi
-
-# Create a feature branch if the option was passed
-if [[ "$create_feature_branch" == "true" ]]; then
-  create_feature
-  exit 0
-fi
-
-# Create local configuration file if the option was passed
-if [[ "$create_local_config" == "true" ]]; then
-  create_local_config_file
-  exit 0
-fi
+case "$selected_command" in
+  status)
+    check_status
+    exit $?
+    ;;
+  close-feature)
+    close_feature
+    exit 0
+    ;;
+  create-feature)
+    create_feature
+    exit 0
+    ;;
+  create-local-config)
+    create_local_config_file
+    exit 0
+    ;;
+esac
 
 # Check if either local or global config exists, load the local config first
 if [ -f "$local_config_file" ]; then
