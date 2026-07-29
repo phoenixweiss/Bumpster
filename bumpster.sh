@@ -98,7 +98,8 @@ elif [ -f "$global_config_file" ]; then
 else
   log "No configuration file found."
   log "Running initial setup..."
-  interactive_setup
+  interactive_setup ||
+    abort "Could not create global configuration file at '$global_config_file'."
 fi
 
 # Prepare the complete release plan before the first local mutation, then run it

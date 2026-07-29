@@ -254,6 +254,11 @@ AFTER_BUMP_BRANCH="dev"
 BEFORE_BUMP_BRANCH="dev"
 ```
 
+If the selected local or global configuration cannot be loaded, Bumpster stops
+instead of continuing with partially applied values. File logging is
+best-effort: an unwritable `LOG_FILE` produces one warning, while the primary
+command continues and keeps its own exit status.
+
 ### AFTER_BUMP_BRANCH option
 
 This option allows you to specify the branch to switch to after a version bump. By default, it switches back to the development branch (so you can resume work in `dev` right after tagging a release). If the specified branch does not exist, it falls back to the configured development branch.
@@ -303,7 +308,9 @@ bumpster --create-local-config
 bump -l
 ```
 
-This guides you through an interactive setup process.
+This guides you through an interactive setup process. If the configuration
+cannot be written, the command returns a non-zero status and does not report
+successful creation.
 
 ### Creating and Closing Feature Branches
 
@@ -332,6 +339,9 @@ successful merge and push, only the stash created by that invocation is restored
 with its staged state on the configured development branch; existing stashes
 remain untouched. If a later operation fails, Bumpster preserves the created
 stash and reports its exact commit ID for manual recovery.
+When branch deletion is enabled, local and remote deletion results are reported
+separately. A rejected remote deletion is warned about and is never reported as
+successful.
 
 ### Custom Hooks
 

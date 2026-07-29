@@ -18,8 +18,16 @@ log() {
   if [[ "$logging_enabled" == "true" ]]; then
     local timestamped_message
     timestamped_message="$(date '+%Y-%m-%d %H:%M:%S') $formatted"
-    echo "$timestamped_message" >> "$log_file"
+    if ! { printf '%s\n' "$timestamped_message" >> "$log_file"; } 2>/dev/null; then
+      if [[ "${logging_failure_reported:-false}" != "true" ]]; then
+        printf '[WARN] Could not write log file %q. Continuing without file logging.\n' \
+          "$log_file" >&2
+        logging_failure_reported="true"
+      fi
+    fi
   fi
+
+  return 0
 }
 
 # Function to run custom hooks (project-level takes priority over global)
@@ -291,23 +299,28 @@ interactive_setup() {
 # Function to create a local config file in the current directory
 create_local_config_file() {
   local current_dir
-  current_dir=$(pwd)
+  current_dir="$(pwd)" ||
+    abort "Could not determine the current directory for local configuration."
   local local_config_file="$current_dir/.bumpsterrc"
 
   if [ -f "$local_config_file" ]; then
     log "Local configuration file already exists at: $local_config_file"
   else
-    interactive_setup "$local_config_file"
+    interactive_setup "$local_config_file" ||
+      abort "Could not create local configuration file at '$local_config_file'."
     log "Local configuration file successfully created at: $local_config_file"
   fi
 }
 
 # Function to load configuration from a config file
 load_config() {
-  if [ -f "$1" ]; then
+  local config_file="$1"
+
+  if [ -f "$config_file" ]; then
     # The configuration path is selected at runtime by design.
     # shellcheck disable=SC1090
-    source "$1"
+    source "$config_file" ||
+      abort "Failed to load configuration from '$config_file'."
     master_branch="${GIT_MASTER_BRANCH:-$default_master_branch}"
     develop_branch="${GIT_DEVELOP_BRANCH:-$default_develop_branch}"
     logging_enabled="${ENABLE_LOGGING:-$default_logging}"
@@ -1423,23 +1436,25 @@ run_release() {
 create_feature() {
   # Use the configured develop branch or fall back to default_develop_branch
   local dev_branch="${develop_branch:-$default_develop_branch}"
+  local current_branch=""
 
   require_git_repository
 
   # Ensure the current branch is dev
-  current_branch=$(git rev-parse --abbrev-ref HEAD)
+  current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" ||
+    abort "Could not determine the current branch."
+  if [[ "$current_branch" == "HEAD" ]]; then
+    abort "Cannot create a feature branch from detached HEAD."
+  fi
   if [[ "$current_branch" != "$dev_branch" ]]; then
     abort "You are not on the development branch ('$dev_branch'). Switch to it before creating a feature branch."
-  fi
-
-  if [[ "$(git rev-parse --abbrev-ref HEAD)" != "$current_branch" ]]; then
-    abort "Current branch mismatch. Expected '$dev_branch'."
   fi
 
   # Prompt for the feature branch name
   local feature_branch_name
   while true; do
-    read -r -p "Enter the name for the new feature branch: " feature_branch_name
+    read -r -p "Enter the name for the new feature branch: " feature_branch_name ||
+      abort "Feature branch name input ended before a valid name was provided."
     # Validate the branch name
     if [[ -z "$feature_branch_name" ]]; then
       echo "Branch name cannot be empty. Please try again."
@@ -1514,6 +1529,43 @@ restore_close_feature_stash() {
     log "Restored changes, but failed to drop operation-owned stash '$stash_ref'." "WARN"
 }
 
+# Delete one merged feature branch locally and, when possible, on origin.
+delete_merged_feature_branch() {
+  local feature_branch_name="$1"
+  local dev_branch="$2"
+  local unmerged_commits=""
+  local remote_refs=""
+
+  unmerged_commits="$(
+    git log --format='%H' "$feature_branch_name" --not "$dev_branch"
+  )" || abort "Could not verify whether feature branch '$feature_branch_name' is fully merged."
+  if [[ -n "$unmerged_commits" ]]; then
+    abort "Feature branch '$feature_branch_name' contains commits not merged into '$dev_branch'."
+  fi
+
+  log "Attempting to delete feature branch '$feature_branch_name'."
+  git branch -d "$feature_branch_name" ||
+    abort "Failed to delete branch '$feature_branch_name'."
+  log "Local feature branch '$feature_branch_name' deleted."
+
+  if ! remote_refs="$(
+    git ls-remote origin "refs/heads/$feature_branch_name" 2>/dev/null
+  )"; then
+    log "Could not determine whether remote branch '$feature_branch_name' exists. Remote state was not changed." "WARN"
+    return 0
+  fi
+  if [[ -z "$remote_refs" ]]; then
+    log "Remote branch '$feature_branch_name' does not exist. Skipping remote deletion."
+    return 0
+  fi
+
+  if git push origin --delete "$feature_branch_name"; then
+    log "Remote branch '$feature_branch_name' deleted."
+  else
+    log "Failed to delete remote branch '$feature_branch_name'." "WARN"
+  fi
+}
+
 # Function to close the current feature branch
 close_feature() {
   # Use the configured develop and master branches, falling back to defaults
@@ -1524,6 +1576,8 @@ close_feature() {
   local delete_response=""
   local stash_before=""
   local created_stash_oid=""
+  local branch_check=""
+  local worktree_status=""
 
   require_git_repository
   current_branch="$(git rev-parse --abbrev-ref HEAD)" ||
@@ -1541,11 +1595,15 @@ close_feature() {
   fi
 
   # Require an operation-owned stash before checkout or merge
-  if [[ -n $(git status --porcelain) ]]; then
+  worktree_status="$(git status --porcelain)" ||
+    abort "Could not inspect the working tree."
+  if [[ -n "$worktree_status" ]]; then
     log "You have uncommitted changes in your working directory."
-    read -r -p \
+    if ! read -r -p \
       "Stash them and restore them on '$dev_branch' after the merge? (y/n): " \
-      stash_response
+      stash_response; then
+      abort "Feature closing confirmation ended before a response was provided."
+    fi
     if [[ "$stash_response" =~ ^(y|Y|yes|Yes)$ ]]; then
       stash_before="$(git rev-parse -q --verify refs/stash 2>/dev/null || true)"
       git stash push --include-untracked -m "Bumpster close-feature: $current_branch" ||
@@ -1554,7 +1612,10 @@ close_feature() {
       if [[ -z "$created_stash_oid" || "$created_stash_oid" == "$stash_before" ]]; then
         abort "Git did not create a new stash for the feature changes."
       fi
-      if [[ -n $(git status --porcelain) ]]; then
+      worktree_status="$(git status --porcelain)" ||
+        abort_close_feature "Could not verify the working tree after stashing." \
+          "$created_stash_oid" "$current_branch"
+      if [[ -n "$worktree_status" ]]; then
         abort_close_feature \
           "Some working tree changes could not be stashed. Feature closing was not started." \
           "$created_stash_oid" "$current_branch"
@@ -1565,7 +1626,10 @@ close_feature() {
     fi
   fi
 
-  if [[ "$(git rev-parse --abbrev-ref HEAD)" != "$current_branch" ]]; then
+  branch_check="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" ||
+    abort_close_feature "Could not verify the current branch before closing the feature." \
+      "$created_stash_oid" "$current_branch"
+  if [[ "$branch_check" != "$current_branch" ]]; then
     abort_close_feature "Current branch mismatch. Expected '$current_branch'." \
       "$created_stash_oid" "$current_branch"
   fi
@@ -1595,43 +1659,29 @@ close_feature() {
   # Handle branch deletion based on configuration
   if [[ "$delete_feature_branch_after_merge" == "true" || "$ask_before_deleting_feature_branch" == "true" ]]; then
     if [[ "$ask_before_deleting_feature_branch" == "true" ]]; then
-      read -r -p "Do you want to delete the feature branch '$current_branch'? (y/n): " delete_response
+      if ! read -r -p \
+        "Do you want to delete the feature branch '$current_branch'? (y/n): " \
+        delete_response; then
+        abort "Feature branch deletion confirmation ended before a response was provided."
+      fi
       if [[ "$delete_response" =~ ^(y|Y|yes|Yes)$ ]]; then
-        if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
-          abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
-        fi
-        log "Attempting to delete feature branch '$current_branch'."
-        git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
-        if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
-          git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'." "WARN"
-          log "Remote branch '$current_branch' deleted."
-        else
-          log "Remote branch '$current_branch' does not exist. Skipping remote deletion."
-        fi
-        log "Feature branch '$current_branch' deleted."
+        delete_merged_feature_branch "$current_branch" "$dev_branch"
       else
         log "Feature branch '$current_branch' retained."
       fi
     else
-      if [[ -n $(git log "$current_branch" --not "$dev_branch") ]]; then
-        abort "Feature branch '$current_branch' contains commits not merged into '$dev_branch'."
-      fi
-      log "Attempting to delete feature branch '$current_branch'."
-      git branch -d "$current_branch" || abort "Failed to delete branch '$current_branch'."
-      if git ls-remote --exit-code origin "$current_branch" &>/dev/null; then
-        git push origin --delete "$current_branch" || log "Failed to delete remote branch '$current_branch'." "WARN"
-        log "Remote branch '$current_branch' deleted."
-      else
-        log "Remote branch '$current_branch' does not exist. Skipping remote deletion."
-      fi
-      log "Feature branch '$current_branch' deleted."
+      delete_merged_feature_branch "$current_branch" "$dev_branch"
     fi
   else
     log "Feature branch '$current_branch' retained."
   fi
 
   # Reminder about uncommitted changes
-  if [[ -n $(git status --porcelain) ]]; then
+  worktree_status="$(git status --porcelain)" || {
+    log "Could not inspect the final working tree state." "WARN"
+    return 0
+  }
+  if [[ -n "$worktree_status" ]]; then
     log "Reminder: You have uncommitted changes in your working directory. Please commit or stash them as needed."
   fi
 }

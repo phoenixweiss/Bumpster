@@ -296,6 +296,24 @@ install_main_rejecting_hook() {
   chmod +x "$hook_path"
 }
 
+install_feature_delete_rejecting_hook() {
+  local hook_path="$fixture_origin/hooks/pre-receive"
+
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'zero_value="0000000000000000000000000000000000000000"\n'
+    printf 'while read -r old_value new_value ref_name; do\n'
+    # The generated hook must contain the literal variable references.
+    # shellcheck disable=SC2016
+    printf '  if [[ "$ref_name" == "refs/heads/feature/example" && "$new_value" == "$zero_value" ]]; then\n'
+    printf '    exit 1\n'
+    printf '  fi\n'
+    printf 'done\n'
+    printf 'exit 0\n'
+  } > "$hook_path" || return 1
+  chmod +x "$hook_path"
+}
+
 test_fixture_uses_local_bare_remote() {
   create_fixture "isolated-remote" || return 1
 
@@ -553,6 +571,54 @@ test_config_file_and_environment_precedence() {
     "Environment overrode a value assigned by the selected config"
 }
 
+test_invalid_selected_config_is_rejected() {
+  create_fixture "config-load-failure" || return 1
+  printf 'false\n' > "$fixture_worktree/.bumpsterrc" || return 1
+
+  run_bumpster --status
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Status unexpectedly ignored a selected config failure" || return 1
+  assert_contains "$cli_output" "Failed to load configuration from" \
+    "Config load failure is unclear" || return 1
+  assert_not_contains "$cli_output" "Current branch:" \
+    "Status continued after the selected config failed"
+}
+
+test_local_config_write_failure_is_not_reported_as_success() {
+  create_fixture "config-write-failure" || return 1
+  rm "$fixture_worktree/.bumpsterrc" || return 1
+  mkdir "$fixture_worktree/.bumpsterrc" || return 1
+
+  run_bumpster_with_input $'\n\n\n\n\n\n\n\n\n' --create-local-config
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Local config creation unexpectedly succeeded for a directory target" ||
+    return 1
+  assert_contains "$cli_output" "Could not create local configuration file" \
+    "Local config write failure is unclear" || return 1
+  assert_not_contains "$cli_output" "successfully created" \
+    "Failed local config creation was reported as successful"
+}
+
+test_logging_failure_warns_without_failing_read_only_command() {
+  create_fixture "logging-write-failure" || return 1
+  mkdir "$fixture_root/log-target" || return 1
+  printf '%s\n' \
+    'ENABLE_LOGGING="true"' \
+    "LOG_FILE=\"$fixture_root/log-target\"" \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+
+  run_bumpster --status
+
+  assert_equal "0" "$cli_status" \
+    "Optional logging failure broke status: $cli_output" || return 1
+  assert_contains "$cli_output" "Could not write log file" \
+    "Optional logging failure has no clear warning" || return 1
+  assert_contains "$cli_output" "Current branch: dev" \
+    "Status stopped after the optional logging failure"
+}
+
 test_custom_release_branches_and_before_after_options() {
   local remote_tag_commit
 
@@ -708,6 +774,31 @@ test_clean_feature_branch_is_closed() {
     git -C "$fixture_worktree" show-ref --verify --quiet refs/heads/feature/example
 }
 
+test_create_feature_reports_unresolved_head() {
+  local empty_repository
+
+  create_fixture "create-feature-unresolved-head" || return 1
+  empty_repository="$fixture_root/empty-repository"
+  git init -q "$empty_repository" || return 1
+
+  cli_output="$(
+    cd "$empty_repository" &&
+      HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      PATH="$test_path" \
+      bash "$project_root/bumpster.sh" --create-feature 2>&1
+  )"
+  cli_status=$?
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Feature creation unexpectedly succeeded without a resolvable HEAD" ||
+    return 1
+  assert_contains "$cli_output" "Could not determine the current branch." \
+    "Feature creation masks an unresolved HEAD" || return 1
+  assert_not_contains "$cli_output" "fatal:" \
+    "Feature creation exposes raw Git errors for an unresolved HEAD"
+}
+
 test_dirty_feature_decline_is_rejected_without_mutation() {
   local initial_branch
   local initial_dev
@@ -857,6 +948,28 @@ test_failed_feature_push_preserves_operation_stash() {
   assert_equal "$initial_remote_dev" \
     "$(git --git-dir="$fixture_origin" rev-parse refs/heads/dev)" \
     "Remote dev changed despite the failed push"
+}
+
+test_failed_remote_feature_deletion_is_not_reported_as_success() {
+  create_feature_fixture "failed-remote-feature-delete" || return 1
+  install_feature_delete_rejecting_hook || return 1
+
+  run_bumpster_with_input "y" --close-feature
+
+  assert_equal "0" "$cli_status" \
+    "Feature close failed after a non-critical remote deletion error: $cli_output" ||
+    return 1
+  assert_contains "$cli_output" "Failed to delete remote branch 'feature/example'." \
+    "Remote feature deletion failure is missing" || return 1
+  assert_not_contains "$cli_output" "Remote branch 'feature/example' deleted." \
+    "Failed remote feature deletion was reported as successful" || return 1
+  assert_contains "$cli_output" "Local feature branch 'feature/example' deleted." \
+    "Successful local feature deletion is not reported precisely" || return 1
+  if git --git-dir="$fixture_origin" show-ref \
+    --verify --quiet refs/heads/feature/example; then
+    return 0
+  fi
+  fail "Rejected remote feature deletion still removed the remote branch"
 }
 
 test_release_notes_extract_version_section() {
@@ -1517,16 +1630,21 @@ main() {
   run_test "status handles a missing upstream without raw Git errors" test_status_handles_missing_upstream
   run_test "local configuration takes priority over global configuration" test_local_config_takes_priority_over_global_config
   run_test "configuration files and environment values have defined precedence" test_config_file_and_environment_precedence
+  run_test "invalid selected configuration is rejected" test_invalid_selected_config_is_rejected
+  run_test "local configuration write failures are not reported as success" test_local_config_write_failure_is_not_reported_as_success
+  run_test "logging failures warn without failing read-only commands" test_logging_failure_warns_without_failing_read_only_command
   run_test "custom release branches honor before and after options" test_custom_release_branches_and_before_after_options
   run_test "missing after-bump branch falls back to configured development" test_missing_after_branch_falls_back_to_configured_development
   run_test "custom release defaults follow configured development" test_custom_release_defaults_to_configured_development
   run_test "hooks use project priority and receive both versions" test_hooks_use_project_priority_and_version_environment
+  run_test "feature creation reports an unresolved HEAD" test_create_feature_reports_unresolved_head
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
   run_test "clean feature close leaves existing stash untouched" test_existing_stash_is_untouched_by_clean_feature_close
   run_test "operation stash restores tracked and untracked changes only" test_operation_stash_is_restored_without_touching_older_stash
   run_test "close from development branch does not create a stash" test_close_from_development_branch_does_not_create_stash
   run_test "failed feature push preserves the exact operation stash" test_failed_feature_push_preserves_operation_stash
+  run_test "failed remote feature deletion is not reported as success" test_failed_remote_feature_deletion_is_not_reported_as_success
   run_test "release notes extract only the requested CHANGELOG section" test_release_notes_extract_version_section
   run_test "release notes reject a version missing from CHANGELOG" test_release_notes_reject_missing_version
   run_test "package sync updates only the root version atomically" test_package_sync_updates_only_root_version_atomically
