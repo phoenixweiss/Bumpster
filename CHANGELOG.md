@@ -9,6 +9,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-07-29
+
+### Added
+
+- Isolated integration coverage for configuration precedence, custom release
+  branch defaults, hook priority and version variables, release-flow
+  delegation, and failure handling in configuration, logging, and feature
+  branch operations.
+
+### Changed
+
+- Release orchestration is split into explicit planning and execution
+  functions, keeping preflight validation before local mutations and removing
+  redundant branch checkouts from the top-level CLI flow.
+- `--status` now loads the selected project or global configuration before
+  classifying custom branches and reports unavailable upstream information
+  without exposing raw Git failures.
+- English and Russian documentation now define the canonical command,
+  configuration precedence, release behavior, requirements, hook timing,
+  language policy, and safe uninstall boundaries consistently.
+
+### Fixed
+
+- Custom development branches now provide the default values for
+  `BEFORE_BUMP_BRANCH` and `AFTER_BUMP_BRANCH`.
+- Selected configuration load failures and configuration write failures stop
+  the command instead of continuing or reporting false success.
+- An unavailable optional log file produces one warning without replacing the
+  primary command result.
+- Feature creation reports an unresolved or detached `HEAD` clearly, while
+  feature closing checks Git state explicitly and never reports a rejected
+  remote branch deletion as successful.
+
 ## [0.9.1] - 2026-07-28
 
 ### Added
@@ -193,7 +226,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.5...v0.9.0
 [0.8.5]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.4...v0.8.5
