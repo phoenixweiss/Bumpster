@@ -32,11 +32,10 @@ default_logging="false"
 delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
 ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
 
-# Default branch to switch to after bump (default to develop branch)
-AFTER_BUMP_BRANCH=${AFTER_BUMP_BRANCH:-"$default_develop_branch"}
-
-# Default branch that must be active before bumping (default to develop branch)
-BEFORE_BUMP_BRANCH=${BEFORE_BUMP_BRANCH:-"$default_before_bump_branch"}
+# Optional branch overrides; load_config resolves empty values to the configured
+# development branch after reading GIT_DEVELOP_BRANCH.
+AFTER_BUMP_BRANCH="${AFTER_BUMP_BRANCH:-}"
+BEFORE_BUMP_BRANCH="${BEFORE_BUMP_BRANCH:-}"
 
 # Config variables (overridden by .bumpsterrc if present)
 master_branch=""

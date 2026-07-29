@@ -315,8 +315,8 @@ load_config() {
     delete_feature_branch_after_merge="${DELETE_FEATURE_BRANCH_AFTER_MERGE:-false}"
     ask_before_deleting_feature_branch="${ASK_BEFORE_DELETING_FEATURE_BRANCH:-true}"
     sync_with_package_json="${SYNC_WITH_PACKAGE_JSON:-false}"
-    after_bump_branch="${AFTER_BUMP_BRANCH:-$default_develop_branch}"
-    before_bump_branch="${BEFORE_BUMP_BRANCH:-$default_before_bump_branch}"
+    after_bump_branch="${AFTER_BUMP_BRANCH:-$develop_branch}"
+    before_bump_branch="${BEFORE_BUMP_BRANCH:-$develop_branch}"
   fi
 }
 
@@ -1139,6 +1139,7 @@ preflight_release() {
 check_or_create_branch() {
   local branch_name="$1"
   local remote_ref="refs/remotes/origin/$branch_name"
+  local current_branch=""
 
   # Check if the branch exists locally
   if ! git show-ref --verify --quiet "refs/heads/$branch_name"; then
@@ -1152,9 +1153,270 @@ check_or_create_branch() {
     fi
     log "Branch '$branch_name' successfully created locally."
   else
-    log "Branch '$branch_name' already exists locally."
-    git checkout "$branch_name" || abort "Failed to switch to branch '$branch_name'."
+    current_branch="$(git branch --show-current)" ||
+      abort "Failed to determine the current branch."
+    if [[ "$current_branch" == "$branch_name" ]]; then
+      log "Already on branch '$branch_name'."
+    else
+      log "Switching to branch '$branch_name'."
+      git checkout "$branch_name" ||
+        abort "Failed to switch to branch '$branch_name'."
+    fi
   fi
+}
+
+# Function to calculate a semantic version without changing repository state
+calculate_next_version() {
+  local source_version="$1"
+  local requested_type="$2"
+  local major
+  local minor
+  local patch
+
+  IFS='.' read -r major minor patch <<< "$source_version"
+  case "$requested_type" in
+    major)
+      major=$((major + 1))
+      minor=0
+      patch=0
+      ;;
+    minor)
+      minor=$((minor + 1))
+      patch=0
+      ;;
+    patch)
+      patch=$((patch + 1))
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  printf '%s.%s.%s\n' "$major" "$minor" "$patch"
+}
+
+# Function to calculate and validate a release plan before local mutations
+prepare_release_plan() {
+  local requested_type="${1:-}"
+  local required_before_branch=""
+  local worktree_status=""
+
+  require_git_repository
+  worktree_status="$(git status --porcelain)" ||
+    abort "Could not inspect the working tree."
+  if [[ -n "$worktree_status" ]]; then
+    abort "Working tree contains unstaged changes. Aborting."
+  fi
+
+  release_develop_branch="${develop_branch:-$default_develop_branch}"
+  release_master_branch="${master_branch:-$default_master_branch}"
+  required_before_branch="${before_bump_branch:-$release_develop_branch}"
+  if [[ -z "$required_before_branch" ]]; then
+    required_before_branch="$release_develop_branch"
+  fi
+  if ! git show-ref --verify --quiet "refs/heads/$required_before_branch"; then
+    abort "Configured BEFORE_BUMP_BRANCH '$required_before_branch' does not exist. Please create it or update your configuration."
+  fi
+
+  release_start_branch="$(git rev-parse --abbrev-ref HEAD)" ||
+    abort "Could not determine the current branch."
+  if [[ "$release_start_branch" != "$required_before_branch" ]]; then
+    abort "Version bumps must be run from '$required_before_branch' (current branch: '$release_start_branch')."
+  fi
+  if [[ "$release_start_branch" == "$release_master_branch" ]]; then
+    abort "BEFORE_BUMP_BRANCH must not be the configured release branch '$release_master_branch'."
+  fi
+
+  default_dev_branch="$release_develop_branch"
+  default_master_branch="$release_master_branch"
+  export default_dev_branch
+  export default_master_branch
+
+  if [[ ! -f "VERSION" ]]; then
+    abort "VERSION file not found. Create it with a semantic version such as 0.1.0 before releasing."
+  fi
+  release_current_version="$(cat VERSION)" ||
+    abort "Failed to read the VERSION file."
+  if [[ ! "$release_current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    abort "VERSION must contain MAJOR.MINOR.PATCH with no prefix, suffix, or leading zeros."
+  fi
+  log "Current version is $release_current_version"
+
+  release_version_type="$requested_type"
+  if [[ -z "$release_version_type" ]]; then
+    read -r -p \
+      "Which version do you want to bump (major/minor/patch)? [patch]: " \
+      release_version_type
+    release_version_type="${release_version_type:-patch}"
+  fi
+  case "$release_version_type" in
+    major | minor | patch) ;;
+    *)
+      abort "Invalid version type. Please choose between 'major', 'minor', or 'patch'."
+      ;;
+  esac
+
+  release_new_version="$(
+    calculate_next_version "$release_current_version" "$release_version_type"
+  )" || abort "Could not calculate the next semantic version."
+  if [[ "$release_current_version" == "$release_new_version" ]]; then
+    abort "New version is the same as the current version."
+  fi
+
+  release_after_branch="${after_bump_branch:-$release_develop_branch}"
+  if ! git show-ref --verify --quiet "refs/heads/$release_after_branch"; then
+    log "Branch '$release_after_branch' does not exist. Falling back to development branch '$release_develop_branch'."
+    release_after_branch="$release_develop_branch"
+  fi
+
+  if [[ "${sync_with_package_json}" == "true" && -f "package.json" ]]; then
+    validate_package_json_for_sync "package.json" ||
+      abort "package.json cannot be synchronized safely."
+  fi
+
+  preflight_release \
+    "$release_new_version" \
+    "$release_develop_branch" \
+    "$release_master_branch"
+
+  export BUMPSTER_PREV_VERSION="$release_current_version"
+  export BUMPSTER_NEW_VERSION="$release_new_version"
+  log "Release plan: $release_current_version -> $release_new_version ($release_version_type)."
+  log "Release branches: start '$release_start_branch', development '$release_develop_branch', release '$release_master_branch', return '$release_after_branch'."
+}
+
+# Function to update and stage files described by the prepared release plan
+stage_release_files() {
+  release_stage="updating VERSION"
+  printf '%s' "$release_new_version" > VERSION ||
+    abort "Failed to write version $release_new_version to VERSION."
+  git add VERSION || abort "Failed to stage VERSION."
+
+  if [[ "${sync_with_package_json}" == "true" ]]; then
+    release_stage="synchronizing package.json"
+    if [[ -f "package.json" ]]; then
+      log "Synchronizing version with package.json."
+      update_package_json_version "package.json" "$release_new_version" ||
+        abort "Failed to update the root package.json version safely."
+      git add package.json || abort "Failed to stage package.json."
+      log "Updated version in package.json to $release_new_version."
+    else
+      log "package.json not found. Skipping synchronization."
+    fi
+  fi
+}
+
+# Function to create the version commit described by the prepared release plan
+commit_release_version() {
+  release_stage="creating the version commit"
+  git commit \
+    -m "bump version to $release_new_version" \
+    -m "Automatic version bump to $release_new_version" ||
+    abort "Failed to create the version commit."
+  log "Created version commit for $release_new_version."
+}
+
+# Function to merge the prepared release branches and create the local tag
+create_release_refs() {
+  release_stage="preparing the development branch"
+  check_or_create_branch "$release_develop_branch"
+
+  if [[ "$release_start_branch" != "$release_develop_branch" ]]; then
+    release_stage="merging into the development branch"
+    log "Merging '$release_start_branch' into '$release_develop_branch'."
+    git merge "$release_start_branch" --no-edit ||
+      abort "Failed to merge '$release_start_branch' into '$release_develop_branch'."
+  fi
+
+  release_stage="preparing the release branch"
+  check_or_create_branch "$release_master_branch"
+
+  release_stage="merging the development branch into the release branch"
+  log "Merging '$release_develop_branch' into '$release_master_branch'."
+  git merge "$release_develop_branch" --no-edit ||
+    abort "Failed to merge '$release_develop_branch' into '$release_master_branch'."
+
+  release_stage="creating the release tag"
+  git tag -a "v$release_new_version" -m "Release $release_new_version" ||
+    abort "Failed to create release tag 'v$release_new_version'."
+}
+
+# Function to publish all prepared release refs as one remote transaction
+publish_release_refs() {
+  release_stage="atomic publication"
+  log "Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically."
+  git push --atomic origin \
+    "$release_develop_branch" \
+    "$release_master_branch" \
+    "refs/tags/v$release_new_version" ||
+    abort "Failed to publish the release atomically. Verify local and remote refs before recovery."
+
+  release_published="true"
+  release_stage="configuring branch upstreams"
+  git branch \
+    --set-upstream-to="origin/$release_develop_branch" \
+    "$release_develop_branch" >/dev/null 2>&1 ||
+    log "Could not configure upstream for '$release_develop_branch'." "WARN"
+  git branch \
+    --set-upstream-to="origin/$release_master_branch" \
+    "$release_master_branch" >/dev/null 2>&1 ||
+    log "Could not configure upstream for '$release_master_branch'." "WARN"
+  log "Release branches and tag published successfully."
+}
+
+# Function to return to the configured branch after publication
+return_to_after_bump_branch() {
+  local current_branch=""
+
+  release_stage="switching to the after-bump branch after publication"
+  if ! git show-ref --verify --quiet "refs/heads/$release_after_branch"; then
+    log "Branch '$release_after_branch' no longer exists. Falling back to '$release_develop_branch'."
+    release_after_branch="$release_develop_branch"
+  fi
+
+  current_branch="$(git branch --show-current)" ||
+    abort "Could not determine the current branch after publication."
+  if [[ "$current_branch" == "$release_after_branch" ]]; then
+    log "Release finished on branch '$release_after_branch'."
+  else
+    log "Returning to branch '$release_after_branch'."
+    git checkout "$release_after_branch" ||
+      abort "Failed to switch to branch '$release_after_branch'."
+  fi
+}
+
+# Function to execute one fully validated release plan
+execute_release_plan() {
+  release_diagnostics_active="true"
+  release_published="false"
+  release_stage="starting local release mutations"
+  release_tag_name="v$release_new_version"
+  trap 'release_exit_handler "$?"' EXIT
+
+  stage_release_files
+  commit_release_version
+  create_release_refs
+  publish_release_refs
+  return_to_after_bump_branch
+
+  release_stage="post-bump hook"
+  run_hook "post-bump"
+
+  release_diagnostics_active="false"
+  trap - EXIT
+}
+
+# Function to prepare and execute one release
+run_release() {
+  local requested_type="${1:-}"
+
+  if [[ -z "${BASH_VERSION:-}" ]]; then
+    abort "Bash is required to run this script."
+  fi
+
+  prepare_release_plan "$requested_type"
+  run_hook "pre-bump"
+  execute_release_plan
 }
 
 # Function to create a feature branch from the current dev branch

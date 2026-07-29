@@ -111,7 +111,9 @@ Before running `--major`, `--minor`, `--patch`, or the interactive release flow:
   `MAJOR.MINOR.PATCH` format, without a `v` prefix, prerelease suffix, or leading
   zeros.
 - Make sure your working tree is clean. `bumpster.sh` refuses to run if there are unstaged or uncommitted changes to prevent accidental data loss.
-- Double-check that the active branch matches your configured `BEFORE_BUMP_BRANCH` (defaults to `dev`); Bumpster aborts otherwise to keep releases consistent.
+- Double-check that the active branch matches your configured
+  `BEFORE_BUMP_BRANCH` (the configured development branch, `dev` by default);
+  Bumpster aborts otherwise to keep releases consistent.
 - Make sure `origin` is configured and reachable. Each local release branch must
   track its matching branch on that remote, such as `dev` tracking `origin/dev`
   and `main` tracking `origin/main`.

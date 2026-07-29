@@ -363,6 +363,26 @@ test_runtime_archive_is_reproducible_and_minimal() {
     "Packaged runtime cannot report its version"
 }
 
+test_cli_delegates_release_execution() {
+  local cli_source
+
+  cli_source="$(<"$project_root/bumpster.sh")" || return 1
+  assert_contains "$cli_source" 'set -o pipefail' \
+    "CLI entry point does not enable pipeline failure handling" || return 1
+  # The assertion intentionally searches for a literal shell variable.
+  # shellcheck disable=SC2016
+  assert_contains "$cli_source" 'run_release "$version_type"' \
+    "CLI entry point does not delegate release execution" || return 1
+  assert_not_contains "$cli_source" "git commit" \
+    "CLI entry point still creates release commits directly" || return 1
+  assert_not_contains "$cli_source" "git merge" \
+    "CLI entry point still merges release branches directly" || return 1
+  assert_not_contains "$cli_source" "git tag" \
+    "CLI entry point still creates release tags directly" || return 1
+  assert_not_contains "$cli_source" "git push" \
+    "CLI entry point still publishes release refs directly"
+}
+
 test_install_and_update_suite() {
   bash "$project_root/tests/install.sh"
 }
@@ -594,6 +614,32 @@ test_missing_after_branch_falls_back_to_configured_development() {
   assert_equal "integration" \
     "$(git -C "$fixture_worktree" branch --show-current)" \
     "Missing AFTER_BUMP_BRANCH did not fall back to configured development"
+}
+
+test_custom_release_defaults_to_configured_development() {
+  create_fixture "custom-release-default-branches" || return 1
+  configure_custom_release_branches || return 1
+  printf '%s\n' \
+    'GIT_MASTER_BRANCH="stable"' \
+    'GIT_DEVELOP_BRANCH="integration"' \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc || return 1
+  git -C "$fixture_worktree" commit -q -m "Configure custom release defaults" ||
+    return 1
+
+  run_bumpster --patch
+
+  assert_equal "0" "$cli_status" \
+    "Custom release defaults failed: $cli_output" || return 1
+  assert_equal "integration" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Before/after defaults did not follow configured development" || return 1
+  assert_equal "0.8.1" \
+    "$(git --git-dir="$fixture_origin" show refs/heads/integration:VERSION)" \
+    "Configured development branch was not released" || return 1
+  assert_equal "0.8.1" \
+    "$(git --git-dir="$fixture_origin" show refs/heads/stable:VERSION)" \
+    "Configured release branch was not updated"
 }
 
 test_hooks_use_project_priority_and_version_environment() {
@@ -994,7 +1040,18 @@ test_release_metadata_matches_published_refs() {
 test_patch_release_flow() {
   create_fixture "patch-release" || return 1
   run_bumpster --patch
-  assert_successful_release "0.8.1"
+  assert_successful_release "0.8.1" || return 1
+  assert_contains "$cli_output" "Release plan: 0.8.0 -> 0.8.1 (patch)." \
+    "Release plan is missing from the action log" || return 1
+  assert_contains "$cli_output" \
+    "Release branches: start 'dev', development 'dev', release 'main', return 'dev'." \
+    "Release branch plan is missing from the action log" || return 1
+  assert_contains "$cli_output" "Already on branch 'dev'." \
+    "Release log does not identify the unchanged development branch" || return 1
+  assert_contains "$cli_output" "Switching to branch 'main'." \
+    "Release log does not identify the release-branch transition" || return 1
+  assert_contains "$cli_output" "Returning to branch 'dev'." \
+    "Release log does not identify the final branch transition"
 }
 
 test_minor_release_flow() {
@@ -1036,6 +1093,30 @@ test_wrong_starting_branch_is_rejected() {
   [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded from main" || return 1
   assert_contains "$cli_output" "Version bumps must be run from 'dev'" \
     "Wrong starting branch error is missing" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_configured_release_branch_cannot_start_release() {
+  local initial_head
+
+  create_fixture "release-branch-start" || return 1
+  git -C "$fixture_worktree" checkout -q main || return 1
+  printf 'BEFORE_BUMP_BRANCH="main"\n' > "$fixture_worktree/.bumpsterrc" ||
+    return 1
+  git -C "$fixture_worktree" add .bumpsterrc || return 1
+  git -C "$fixture_worktree" commit -q -m "Configure unsafe release start" ||
+    return 1
+  git -C "$fixture_worktree" push -q origin main || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --patch
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Release unexpectedly started from the configured release branch" ||
+    return 1
+  assert_contains "$cli_output" \
+    "BEFORE_BUMP_BRANCH must not be the configured release branch 'main'." \
+    "Unsafe release-branch start error is unclear" || return 1
   assert_release_state_unchanged "$initial_head" "0.8.0"
 }
 
@@ -1427,6 +1508,7 @@ main() {
 
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
   run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
+  run_test "CLI delegates release execution to the release functions" test_cli_delegates_release_execution
   run_test "install and update flows are transactional" test_install_and_update_suite
   run_test "status uses the default branch configuration" test_status_uses_default_configuration
   run_test "status uses local custom branch configuration" test_status_uses_local_branch_configuration
@@ -1437,6 +1519,7 @@ main() {
   run_test "configuration files and environment values have defined precedence" test_config_file_and_environment_precedence
   run_test "custom release branches honor before and after options" test_custom_release_branches_and_before_after_options
   run_test "missing after-bump branch falls back to configured development" test_missing_after_branch_falls_back_to_configured_development
+  run_test "custom release defaults follow configured development" test_custom_release_defaults_to_configured_development
   run_test "hooks use project priority and receive both versions" test_hooks_use_project_priority_and_version_environment
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
@@ -1456,6 +1539,7 @@ main() {
   run_test "major release resets minor and patch and publishes the release" test_major_release_flow
   run_test "dirty worktree is rejected without release mutations" test_dirty_worktree_is_rejected
   run_test "wrong starting branch is rejected without release mutations" test_wrong_starting_branch_is_rejected
+  run_test "configured release branch cannot start a release" test_configured_release_branch_cannot_start_release
   run_test "missing VERSION is rejected without release mutations" test_missing_version_file_is_rejected_without_mutation
   run_test "invalid semantic versions are rejected without release mutations" test_invalid_version_is_rejected_without_mutation
   run_test "missing origin is rejected without release mutations" test_missing_origin_is_rejected_without_mutation
