@@ -9,13 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-07-29
+
 ### Added
 
 - A canonical English CLI compatibility contract with a synchronized Russian
   translation, covering commands, configuration, hooks, exit semantics, side
   effects, and safety guarantees intended for `1.x`.
-- Regression coverage for the documented help/version surface and rejection of
-  ambiguous action selections.
+- Regression tests for the documented `--help` and `--version` output and for
+  rejection of ambiguous action selections.
 
 ### Changed
 
@@ -242,7 +244,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.8.5...v0.9.0
