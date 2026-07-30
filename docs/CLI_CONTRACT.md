@@ -144,6 +144,11 @@ Bumpster uses English CLI output and the severity labels `[INFO]`, `[WARN]`, and
 wording, Git subprocess output, progress ordering, and optional informational
 lines are not a machine-readable API.
 
+In an interactive terminal, release values may be highlighted with ANSI color.
+Color is disabled when standard output is redirected or piped, when `TERM` is
+`dumb`, or when `NO_COLOR` has a non-empty value. File logs are always plain
+text without ANSI escape sequences.
+
 The stable machine-readable version output is:
 
 ```text

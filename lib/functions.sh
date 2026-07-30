@@ -8,11 +8,13 @@ log() {
   local message="$1"
   local level="${2:-INFO}"
   local formatted="[$level] $message"
+  local terminal_message="${3:-$message}"
+  local terminal_formatted="[$level] $terminal_message"
 
   if [[ "$level" == "ERROR" ]]; then
-    >&2 echo "$formatted"
+    printf '%s\n' "$terminal_formatted" >&2
   else
-    echo "$formatted"
+    printf '%s\n' "$terminal_formatted"
   fi
 
   if [[ "$logging_enabled" == "true" ]]; then
@@ -28,6 +30,37 @@ log() {
   fi
 
   return 0
+}
+
+# Return success when the selected output descriptor is an interactive terminal.
+log_output_is_terminal() {
+  local descriptor="$1"
+
+  [[ -t "$descriptor" ]]
+}
+
+# Highlight values only in interactive terminal output. The plain message is
+# still used for redirected output and optional file logging.
+log_highlighted() {
+  local message="$1"
+  shift
+  local terminal_message="$message"
+  local value
+  local colored_value
+
+  if [[ -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]] &&
+    log_output_is_terminal 1; then
+    for value in "$@"; do
+      [[ -n "$value" ]] || continue
+      [[ "$value" =~ ^[[:alnum:]._-]+$ ]] || continue
+      printf -v colored_value '\033[1;33m%s\033[0m' "$value"
+      # Values are restricted above so they cannot act as glob patterns here.
+      # shellcheck disable=SC2295
+      terminal_message="${terminal_message//$value/$colored_value}"
+    done
+  fi
+
+  log "$message" "INFO" "$terminal_message"
 }
 
 # Function to run custom hooks (project-level takes priority over global)
@@ -1256,7 +1289,9 @@ prepare_release_plan() {
   if [[ ! "$release_current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
     abort "VERSION must contain MAJOR.MINOR.PATCH with no prefix, suffix, or leading zeros."
   fi
-  log "Current version is $release_current_version"
+  log_highlighted \
+    "Current version is $release_current_version" \
+    "$release_current_version"
 
   release_version_type="$requested_type"
   if [[ -z "$release_version_type" ]]; then
@@ -1297,7 +1332,11 @@ prepare_release_plan() {
 
   export BUMPSTER_PREV_VERSION="$release_current_version"
   export BUMPSTER_NEW_VERSION="$release_new_version"
-  log "Release plan: $release_current_version -> $release_new_version ($release_version_type)."
+  log_highlighted \
+    "Release plan: $release_current_version -> $release_new_version ($release_version_type)." \
+    "$release_current_version" \
+    "$release_new_version" \
+    "$release_version_type"
   log "Release branches: start '$release_start_branch', development '$release_develop_branch', release '$release_master_branch', return '$release_after_branch'."
 }
 
@@ -1315,7 +1354,9 @@ stage_release_files() {
       update_package_json_version "package.json" "$release_new_version" ||
         abort "Failed to update the root package.json version safely."
       git add package.json || abort "Failed to stage package.json."
-      log "Updated version in package.json to $release_new_version."
+      log_highlighted \
+        "Updated version in package.json to $release_new_version." \
+        "$release_new_version"
     else
       log "package.json not found. Skipping synchronization."
     fi
@@ -1329,7 +1370,9 @@ commit_release_version() {
     -m "bump version to $release_new_version" \
     -m "Automatic version bump to $release_new_version" ||
     abort "Failed to create the version commit."
-  log "Created version commit for $release_new_version."
+  log_highlighted \
+    "Created version commit for $release_new_version." \
+    "$release_new_version"
 }
 
 # Function to merge the prepared release branches and create the local tag
@@ -1360,7 +1403,9 @@ create_release_refs() {
 # Function to publish all prepared release refs as one remote transaction
 publish_release_refs() {
   release_stage="atomic publication"
-  log "Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically."
+  log_highlighted \
+    "Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically." \
+    "v$release_new_version"
   git push --atomic origin \
     "$release_develop_branch" \
     "$release_master_branch" \

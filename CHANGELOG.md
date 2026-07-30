@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Interactive release logs highlight the current and next version, release
+  type, and tag. Redirected output, pipes, `NO_COLOR` sessions, and file logs
+  remain plain text without ANSI escape sequences.
+
 ## [0.9.3] - 2026-07-29
 
 ### Added

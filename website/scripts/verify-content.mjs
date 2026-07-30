@@ -249,12 +249,12 @@ for (const message of [
 }
 
 for (const sourceMessage of [
-  'log "Current version is $release_current_version"',
+  '"Current version is $release_current_version"',
   'log "Running release preflight checks."',
   'log "Release preflight checks passed."',
-  'log "Release plan: $release_current_version -> $release_new_version ($release_version_type)."',
-  'log "Created version commit for $release_new_version."',
-  "log \"Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically.\"",
+  '"Release plan: $release_current_version -> $release_new_version ($release_version_type)."',
+  '"Created version commit for $release_new_version."',
+  "\"Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically.\"",
   'log "Release branches and tag published successfully."',
   "log \"Returning to branch '$release_after_branch'.\"",
 ]) {

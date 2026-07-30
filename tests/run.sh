@@ -702,6 +702,113 @@ test_logging_failure_warns_without_failing_read_only_command() {
     "Status stopped after the optional logging failure"
 }
 
+test_release_log_colors_respect_terminal_and_no_color() {
+  local color_root="$suite_root/release-log-colors"
+  local color_log="$color_root/bumpster.log"
+  local plain_output
+  local color_output
+  local no_color_output
+  local dumb_terminal_output
+  local file_output
+  local ansi_prefix=$'\033['
+
+  mkdir -p "$color_root/home" || return 1
+
+  plain_output="$(
+    HOME="$color_root/home" \
+      BUMPSTER_HOME="$project_root" \
+      TERM="xterm-256color" \
+      bash -c '
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        logging_enabled="false"
+        log_highlighted \
+          "Release plan: 0.8.0 -> 0.8.1 (patch)." \
+          "0.8.0" \
+          "0.8.1" \
+          "patch"
+      ' bumpster-color-test "$project_root"
+  )" || return 1
+
+  assert_equal \
+    "[INFO] Release plan: 0.8.0 -> 0.8.1 (patch)." \
+    "$plain_output" \
+    "Redirected release output changed unexpectedly" || return 1
+  assert_not_contains "$plain_output" "$ansi_prefix" \
+    "Redirected release output contains ANSI color" || return 1
+
+  color_output="$(
+    HOME="$color_root/home" \
+      BUMPSTER_HOME="$project_root" \
+      TERM="xterm-256color" \
+      bash -c '
+        unset NO_COLOR
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        log_output_is_terminal() {
+          return 0
+        }
+        logging_enabled="true"
+        log_file="$2"
+        log_highlighted \
+          "Release plan: 0.8.0 -> 0.8.1 (patch)." \
+          "0.8.0" \
+          "0.8.1" \
+          "patch"
+      ' bumpster-color-test "$project_root" "$color_log"
+  )" || return 1
+
+  assert_equal \
+    $'[INFO] Release plan: \033[1;33m0.8.0\033[0m -> \033[1;33m0.8.1\033[0m (\033[1;33mpatch\033[0m).' \
+    "$color_output" \
+    "Interactive release output is formatted incorrectly" || return 1
+
+  file_output="$(<"$color_log")" || return 1
+  assert_contains "$file_output" \
+    "[INFO] Release plan: 0.8.0 -> 0.8.1 (patch)." \
+    "File logging lost the plain release message" || return 1
+  assert_not_contains "$file_output" "$ansi_prefix" \
+    "File logging contains ANSI color" || return 1
+
+  no_color_output="$(
+    HOME="$color_root/home" \
+      BUMPSTER_HOME="$project_root" \
+      NO_COLOR="1" \
+      TERM="xterm-256color" \
+      bash -c '
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        log_output_is_terminal() {
+          return 0
+        }
+        logging_enabled="false"
+        log_highlighted "Current version is 0.8.0" "0.8.0"
+      ' bumpster-color-test "$project_root"
+  )" || return 1
+
+  assert_not_contains "$no_color_output" "$ansi_prefix" \
+    "NO_COLOR did not disable ANSI color" || return 1
+
+  dumb_terminal_output="$(
+    HOME="$color_root/home" \
+      BUMPSTER_HOME="$project_root" \
+      TERM="dumb" \
+      bash -c '
+        unset NO_COLOR
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        log_output_is_terminal() {
+          return 0
+        }
+        logging_enabled="false"
+        log_highlighted "Current version is 0.8.0" "0.8.0"
+      ' bumpster-color-test "$project_root"
+  )" || return 1
+
+  assert_not_contains "$dumb_terminal_output" "$ansi_prefix" \
+    "TERM=dumb did not disable ANSI color"
+}
+
 test_custom_release_branches_and_before_after_options() {
   local remote_tag_commit
 
@@ -1239,6 +1346,8 @@ test_patch_release_flow() {
   assert_successful_release "0.8.1" || return 1
   assert_contains "$cli_output" "Release plan: 0.8.0 -> 0.8.1 (patch)." \
     "Release plan is missing from the action log" || return 1
+  assert_not_contains "$cli_output" $'\033[' \
+    "Captured release output contains ANSI color" || return 1
   assert_contains "$cli_output" \
     "Release branches: start 'dev', development 'dev', release 'main', return 'dev'." \
     "Release branch plan is missing from the action log" || return 1
@@ -1718,6 +1827,7 @@ main() {
   run_test "invalid selected configuration is rejected" test_invalid_selected_config_is_rejected
   run_test "local configuration write failures are not reported as success" test_local_config_write_failure_is_not_reported_as_success
   run_test "logging failures warn without failing read-only commands" test_logging_failure_warns_without_failing_read_only_command
+  run_test "release colors require a TTY and keep pipes and logs plain" test_release_log_colors_respect_terminal_and_no_color
   run_test "custom release branches honor before and after options" test_custom_release_branches_and_before_after_options
   run_test "missing after-bump branch falls back to configured development" test_missing_after_branch_falls_back_to_configured_development
   run_test "custom release defaults follow configured development" test_custom_release_defaults_to_configured_development
