@@ -12,6 +12,7 @@
                         /_/
 ```
 
+[WEBSITE](https://phoenixweiss.github.io/Bumpster/) ·
 [RUSSIAN VERSION](README_RU.md)
 
 **Bumpster** is a powerful utility for automating semantic version management. The name combines *"bump"* and *"buster"*, highlighting its ability to quickly and efficiently handle version bumps for your software projects.
@@ -461,14 +462,14 @@ with:
 The archive is generated from an explicit whitelist and contains only
 `bumpster.sh`, `config.sh`, `VERSION`, `LICENSE`, and the required `lib/` files.
 It excludes the installer, documentation, tests, CI configuration, development
-files, and any future website sources. Repeated builds of the same ref produce
-the same archive bytes.
+files, and website source. Repeated builds of the same ref produce the same
+archive bytes.
 
 Release notes are maintained in the canonical English `CHANGELOG.md`. Preview
 the notes that would be published for a version with:
 
 ```bash
-./scripts/release-notes.sh 0.9.3
+./scripts/release-notes.sh 1.0.0
 ```
 
 Each scenario creates a temporary working repository, an isolated `HOME`, and a
@@ -516,7 +517,8 @@ the runtime archive to the Bumpster repository and its GitHub Actions build.
 English is the canonical language for source comments, CLI output, configuration
 examples, `README.md`, `CHANGELOG.md`, GitHub Release notes, and the primary
 website. Russian is the first maintained additional language in
-`README_RU.md` and the future Russian website locale.
+`README_RU.md` and the
+[Russian website locale](https://phoenixweiss.github.io/Bumpster/ru/).
 
 Write user-facing documentation in English first, then update the Russian
 version with the same meaning in the same change. Future translations must use

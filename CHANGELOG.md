@@ -9,11 +9,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-30
+
 ### Added
 
+- A bilingual English and Russian Vue 3 website for installation, release-flow
+  guidance, command reference, configuration, hooks, and the minimal runtime
+  footprint.
+- Separate Website CI that verifies examples against the CLI, documentation,
+  and runtime whitelist, builds both locales, and enforces Lighthouse
+  accessibility, best practices, SEO, performance, and resource budgets.
+- A manual GitHub Pages workflow that deploys only the built website from a
+  published stable release tag.
 - Interactive release logs highlight the current and next version, release
   type, and tag. Redirected output, pipes, `NO_COLOR` sessions, and file logs
   remain plain text without ANSI escape sequences.
+
+### Changed
+
+- `1.0.0` starts the documented `1.x` compatibility line for commands, options,
+  configuration, hooks, exit behavior, side effects, and release safety
+  guarantees.
+- Website source and frontend tooling remain outside the runtime archive and
+  are never installed or downloaded by the CLI installer and self-update flow.
+- Russian user documentation consistently uses «хуки» while keeping hook paths
+  and code identifiers unchanged.
 
 ## [0.9.3] - 2026-07-29
 
@@ -250,7 +270,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.3...v1.0.0
 [0.9.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.0...v0.9.1
