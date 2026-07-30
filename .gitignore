@@ -1,5 +1,9 @@
 # dotenv environment variables file
 .env
 bumpster.log
+
+# OS metadata
+.DS_Store
+
 AGENTS.md
 *.tmp.md
