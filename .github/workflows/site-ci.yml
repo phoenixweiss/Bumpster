@@ -88,4 +88,19 @@ jobs:
           grep -Fq '/Bumpster/assets/' dist/ru/index.html
 
       - name: Check Lighthouse budgets
-        run: npm run lighthouse
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          chrome_path="$(
+            command -v google-chrome ||
+              command -v google-chrome-stable ||
+              true
+          )"
+
+          if [[ -z "$chrome_path" ]]; then
+            printf 'Google Chrome is not available on the runner.\n' >&2
+            exit 1
+          fi
+
+          CHROME_PATH="$chrome_path" npm run lighthouse
