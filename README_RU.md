@@ -542,7 +542,7 @@ rm -rf -- "$HOME/.bumpster"
 
 ## Автор
 
-Создатель и поддерживающий разработчик: **PAVEL TKACHEV (phoenixweiss)**.
+Автор и сопровождающий проекта — [Павел Ткачев (@phoenixweiss)](https://github.com/phoenixweiss).
 
 ## Лицензия
 

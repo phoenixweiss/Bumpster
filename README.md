@@ -540,7 +540,7 @@ Remove them separately only after checking that they are no longer needed.
 
 ## Author
 
-Created and maintained by **PAVEL TKACHEV (phoenixweiss)**.
+Created and maintained by [Pavel Tkachev (@phoenixweiss)](https://github.com/phoenixweiss).
 
 ## License
 
