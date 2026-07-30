@@ -1,0 +1,85 @@
+name: Website CI
+
+on:
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/dependabot.yml"
+      - ".github/workflows/site-ci.yml"
+      - ".github/workflows/pages.yml"
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - "website/**"
+      - ".github/dependabot.yml"
+      - ".github/workflows/site-ci.yml"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  website:
+    name: Lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: website/.nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Build website
+        run: npm run build
+
+      - name: Verify static output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for required_file in \
+            dist/index.html \
+            dist/ru/index.html \
+            dist/favicon.svg \
+            dist/robots.txt \
+            dist/site.webmanifest \
+            dist/sitemap.xml
+          do
+            if [[ ! -f "$required_file" ]]; then
+              printf 'Missing website output: %s\n' "$required_file" >&2
+              exit 1
+            fi
+          done
+
+          if find dist -type l -print -quit | grep -q .; then
+            printf 'Website output must not contain symbolic links.\n' >&2
+            exit 1
+          fi
+
+          grep -Fq '/Bumpster/assets/' dist/index.html
+          grep -Fq '/Bumpster/assets/' dist/ru/index.html

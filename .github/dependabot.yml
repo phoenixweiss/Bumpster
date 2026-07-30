@@ -9,3 +9,16 @@ updates:
       time: "04:00"
       timezone: Europe/Moscow
     open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:30"
+      timezone: Europe/Moscow
+    open-pull-requests-limit: 5
+    groups:
+      website-dependencies:
+        patterns:
+          - "*"
