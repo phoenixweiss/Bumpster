@@ -42,23 +42,38 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: website/.nvmrc
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: yarn
+          cache-dependency-path: website/yarn.lock
+
+      - name: Verify Yarn Classic
+        shell: bash
+        run: |
+          expected_version="$(
+            node -p "require('./package.json').packageManager.replace(/^yarn@/, '')"
+          )"
+          actual_version="$(yarn --version)"
+
+          if [[ "$actual_version" != "$expected_version" ]]; then
+            printf 'Expected Yarn %s, found %s.\n' \
+              "$expected_version" \
+              "$actual_version" >&2
+            exit 1
+          fi
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile --non-interactive
 
       - name: Run lint
-        run: npm run lint
+        run: yarn run lint
 
       - name: Check formatting
-        run: npm run format:check
+        run: yarn run format:check
 
       - name: Verify website content
-        run: npm run content:check
+        run: yarn run content:check
 
       - name: Build website
-        run: npm run build
+        run: yarn run build
 
       - name: Verify static output
         shell: bash
@@ -103,4 +118,4 @@ jobs:
             exit 1
           fi
 
-          CHROME_PATH="$chrome_path" npm run lighthouse
+          CHROME_PATH="$chrome_path" yarn run lighthouse
