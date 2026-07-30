@@ -1,0 +1,18 @@
+{
+  "name": "Bumpster",
+  "short_name": "Bumpster",
+  "description": "Safe semantic versioning and Git releases from one Bash CLI.",
+  "start_url": "/Bumpster/",
+  "scope": "/Bumpster/",
+  "display": "standalone",
+  "background_color": "#f1f1f1",
+  "theme_color": "#8c0327",
+  "icons": [
+    {
+      "src": "/Bumpster/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://phoenixweiss.github.io/Bumpster/sitemap.xml
