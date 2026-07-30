@@ -1,7 +1,17 @@
 <script setup>
 import { computed, ref } from "vue";
 
-import { bumpOptions, content, installCommand } from "@/data/content";
+import { content } from "@/data/content";
+import {
+  bumpOptions,
+  configExample,
+  createTerminalLines,
+  featureExample,
+  hooksExample,
+  installCommand,
+  pathCommand,
+  uninstallCommand,
+} from "@/data/examples";
 
 const props = defineProps({
   locale: {
@@ -16,59 +26,9 @@ const activeGuide = ref("config");
 
 const t = computed(() => content[props.locale] ?? content.en);
 const release = computed(() => bumpOptions[releaseType.value]);
-const terminalLines = computed(() => [
-  {
-    id: "current",
-    segments: [
-      { text: "Current version is " },
-      { text: release.value.previous, variable: true },
-    ],
-  },
-  {
-    id: "preflight-start",
-    segments: [{ text: "Running release preflight checks." }],
-  },
-  {
-    id: "preflight-complete",
-    segments: [{ text: "Release preflight checks passed." }],
-  },
-  {
-    id: "plan",
-    segments: [
-      { text: "Release plan: " },
-      { text: release.value.previous, variable: true },
-      { text: " -> " },
-      { text: release.value.next, variable: true },
-      { text: " (" },
-      { text: releaseType.value, variable: true },
-      { text: ")." },
-    ],
-  },
-  {
-    id: "commit",
-    segments: [
-      { text: "Created version commit for " },
-      { text: release.value.next, variable: true },
-      { text: "." },
-    ],
-  },
-  {
-    id: "publish",
-    segments: [
-      { text: "Publishing 'dev', 'main', and tag '" },
-      { text: `v${release.value.next}`, variable: true },
-      { text: "' atomically." },
-    ],
-  },
-  {
-    id: "published",
-    segments: [{ text: "Release branches and tag published successfully." }],
-  },
-  {
-    id: "return",
-    segments: [{ text: "Returning to branch 'dev'." }],
-  },
-]);
+const terminalLines = computed(() =>
+  createTerminalLines(release.value, releaseType.value),
+);
 const currentYear = new Date().getFullYear();
 const baseUrl = import.meta.env.BASE_URL;
 const languageUrl = computed(() =>
@@ -84,34 +44,6 @@ const contractUrl = computed(() =>
     ? "https://github.com/phoenixweiss/Bumpster/blob/main/docs/CLI_CONTRACT_RU.md"
     : "https://github.com/phoenixweiss/Bumpster/blob/main/docs/CLI_CONTRACT.md",
 );
-
-const pathCommand =
-  "echo 'export PATH=\"$HOME/.bumpster/bin:$PATH\"' >> ~/.bashrc";
-const uninstallCommand = 'rm -rf -- "$HOME/.bumpster"';
-
-const configExample = `# ./.bumpsterrc
-GIT_MASTER_BRANCH="main"
-GIT_DEVELOP_BRANCH="dev"
-ENABLE_LOGGING="true"
-SYNC_WITH_PACKAGE_JSON="true"
-BEFORE_BUMP_BRANCH="dev"
-AFTER_BUMP_BRANCH="dev"`;
-
-const hooksExample = `#!/usr/bin/env bash
-# .bumpster/hooks/pre-bump
-
-printf 'Checking %s → %s\\n' \\
-  "$BUMPSTER_PREV_VERSION" \\
-  "$BUMPSTER_NEW_VERSION"
-
-npm test || exit 1`;
-
-const featureExample = `bumpster --create-feature
-
-git add .
-git commit -m "Add feature"
-
-bumpster --close-feature`;
 
 const guide = computed(() => {
   const guides = {

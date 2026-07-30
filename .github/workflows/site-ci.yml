@@ -54,6 +54,9 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      - name: Verify website content
+        run: npm run content:check
+
       - name: Build website
         run: npm run build
 
@@ -83,3 +86,6 @@ jobs:
 
           grep -Fq '/Bumpster/assets/' dist/index.html
           grep -Fq '/Bumpster/assets/' dist/ru/index.html
+
+      - name: Check Lighthouse budgets
+        run: npm run lighthouse

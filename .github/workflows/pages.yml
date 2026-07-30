@@ -83,6 +83,9 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      - name: Verify website content
+        run: npm run content:check
+
       - name: Build website
         run: npm run build
 

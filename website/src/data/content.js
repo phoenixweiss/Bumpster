@@ -1,27 +1,3 @@
-export const installCommand =
-  '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"';
-
-export const bumpOptions = {
-  patch: {
-    command: "bumpster --patch",
-    shortCommand: "bump -p",
-    previous: "1.4.2",
-    next: "1.4.3",
-  },
-  minor: {
-    command: "bumpster --minor",
-    shortCommand: "bump -m",
-    previous: "1.4.2",
-    next: "1.5.0",
-  },
-  major: {
-    command: "bumpster --major",
-    shortCommand: "bump -M",
-    previous: "1.4.2",
-    next: "2.0.0",
-  },
-};
-
 export const content = {
   en: {
     skip: "Skip to content",

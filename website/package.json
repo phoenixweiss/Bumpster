@@ -12,7 +12,11 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "content:check": "node scripts/verify-content.mjs",
+    "lighthouse": "node scripts/run-lighthouse.mjs",
+    "check": "npm run lint && npm run format:check && npm run content:check && npm run build",
+    "check:full": "npm run check && npm run lighthouse"
   },
   "dependencies": {
     "@fontsource-variable/nunito-sans": "5.3.0",
@@ -25,6 +29,7 @@
     "eslint": "10.8.0",
     "eslint-plugin-vue": "10.10.0",
     "globals": "17.8.0",
+    "lighthouse": "13.4.1",
     "prettier": "3.9.6",
     "vite": "8.1.5"
   }

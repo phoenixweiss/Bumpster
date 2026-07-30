@@ -695,7 +695,7 @@ a {
 }
 
 .command-block > div:first-child span {
-  color: var(--color-neutral);
+  color: var(--color-primary);
   font-family: var(--mono);
   font-size: 14px;
   font-weight: 700;
@@ -1012,7 +1012,7 @@ a {
 }
 
 .uninstall-row > div > span {
-  color: var(--color-neutral);
+  color: var(--color-primary);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
