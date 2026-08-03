@@ -1129,12 +1129,19 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 6px;
   min-height: 102px;
   text-align: center;
 }
 
 .footer-inner small {
   font-size: 14px;
+}
+
+.footer-version {
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
 }
 
 .footer-inner a {

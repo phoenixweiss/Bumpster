@@ -15,8 +15,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "content:check": "node scripts/verify-content.mjs",
+    "version:check": "node scripts/verify-version.mjs",
     "lighthouse": "node scripts/run-lighthouse.mjs",
-    "check": "yarn run lint && yarn run format:check && yarn run content:check && yarn run build",
+    "check": "yarn run lint && yarn run format:check && yarn run content:check && yarn run build && yarn run version:check",
     "check:full": "yarn run check && yarn run lighthouse"
   },
   "dependencies": {

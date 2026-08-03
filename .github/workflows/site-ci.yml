@@ -102,6 +102,9 @@ jobs:
           grep -Fq '/Bumpster/assets/' dist/index.html
           grep -Fq '/Bumpster/assets/' dist/ru/index.html
 
+      - name: Verify built Bumpster version
+        run: yarn run version:check
+
       - name: Check Lighthouse budgets
         shell: bash
         run: |

@@ -31,6 +31,8 @@ const terminalLines = computed(() =>
 );
 const currentYear = new Date().getFullYear();
 const baseUrl = import.meta.env.BASE_URL;
+const bumpsterVersion = import.meta.env.BUMPSTER_VERSION;
+const releaseUrl = `https://github.com/phoenixweiss/Bumpster/releases/tag/v${bumpsterVersion}`;
 const languageUrl = computed(() =>
   props.locale === "ru" ? baseUrl : `${baseUrl}ru/`,
 );
@@ -530,6 +532,16 @@ async function copyText(key, value) {
 
   <footer class="site-footer">
     <div class="shell footer-inner">
+      <small class="footer-version">
+        <a
+          :href="releaseUrl"
+          :aria-label="`${t.footer.versionLabel} ${bumpsterVersion}`"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Bumpster v{{ bumpsterVersion }}
+        </a>
+      </small>
       <small>
         &copy; {{ currentYear }} {{ t.footer.madeWith }}
         <a href="https://vuejs.org/" target="_blank" rel="noreferrer">Vue</a>

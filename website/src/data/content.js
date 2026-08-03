@@ -150,6 +150,7 @@ export const content = {
       source: "View source",
     },
     footer: {
+      versionLabel: "Bumpster version",
       madeWith: "Made with",
       and: "and",
       madeBy: "and ❤️ by",
@@ -308,6 +309,7 @@ export const content = {
       source: "Открыть исходники",
     },
     footer: {
+      versionLabel: "Версия Bumpster",
       madeWith: "Сделано с помощью",
       and: "и",
       madeBy: "и с ❤️ от",
