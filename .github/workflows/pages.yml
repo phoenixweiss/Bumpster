@@ -1,6 +1,11 @@
 name: Website deployment
 
 on:
+  workflow_run:
+    workflows:
+      - Release
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       release_tag:
@@ -18,6 +23,11 @@ concurrency:
 jobs:
   build:
     name: Build release website
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -29,16 +39,34 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ inputs.release_tag }}
+          ref: >-
+            ${{
+              github.event_name == 'workflow_run' &&
+              github.event.workflow_run.head_sha ||
+              inputs.release_tag
+            }}
 
       - name: Validate published release
         shell: bash
         env:
+          AUTOMATIC_DEPLOY: ${{ github.event_name == 'workflow_run' }}
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_COMMIT: ${{ github.event.workflow_run.head_sha || '' }}
+          RELEASE_TAG: >-
+            ${{
+              github.event_name == 'workflow_run' &&
+              github.event.workflow_run.head_branch ||
+              inputs.release_tag
+            }}
+          WORKFLOW_EVENT: ${{ github.event.workflow_run.event || '' }}
         working-directory: .
         run: |
           set -euo pipefail
+
+          if [[ "$AUTOMATIC_DEPLOY" == "true" && "$WORKFLOW_EVENT" != "push" ]]; then
+            printf 'Automatic deployment requires a completed tag push workflow.\n' >&2
+            exit 1
+          fi
 
           if [[ ! "$RELEASE_TAG" =~ ^v([1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             printf 'Expected a stable release tag v1.0.0 or newer.\n' >&2
@@ -55,15 +83,49 @@ jobs:
             exit 1
           fi
 
+          release_commit="$(git rev-parse HEAD)"
+          tag_commit="$(git rev-parse "$RELEASE_TAG^{commit}")"
+
+          if [[ "$tag_commit" != "$release_commit" ]]; then
+            printf 'Release tag %s does not point to checked out commit %s.\n' \
+              "$RELEASE_TAG" \
+              "$release_commit" >&2
+            exit 1
+          fi
+
+          if [[ -n "$RELEASE_COMMIT" && "$RELEASE_COMMIT" != "$release_commit" ]]; then
+            printf 'Release workflow commit %s does not match checked out commit %s.\n' \
+              "$RELEASE_COMMIT" \
+              "$release_commit" >&2
+            exit 1
+          fi
+
           gh api \
             "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
             > "$RUNNER_TEMP/pages-release.json"
 
           jq -e \
+            --arg archive "bumpster-$version.tar.gz" \
+            --arg commit "$release_commit" \
+            --arg tag "$RELEASE_TAG" \
             '
               .draft == false and
               .prerelease == false and
-              (.assets | length) == 2
+              .tag_name == $tag and
+              .target_commitish == $commit and
+              (.assets | length) == 2 and
+              all(
+                .assets[];
+                .state == "uploaded" and
+                .size > 0 and
+                (.digest | startswith("sha256:"))
+              ) and
+              (
+                [.assets[].name] | sort
+              ) ==
+              (
+                [$archive, "SHA256SUMS"] | sort
+              )
             ' \
             "$RUNNER_TEMP/pages-release.json" >/dev/null
 
