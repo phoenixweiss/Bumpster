@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-03
+
+### Added
+
+- The website footer now shows the version from the root `VERSION` file and
+  links to the matching GitHub Release.
+- Website CI and Pages builds verify that both English and Russian output
+  contain the expected version.
+
+### Changed
+
+- Dependabot version-update pull requests for GitHub Actions and website
+  dependencies now target `dev` and follow the normal release flow.
+- Updated the release provenance action to `actions/attest` 4.2.1 and the
+  website build tool to Vite 8.2.0.
+- English and Russian documentation now link the maintainer name and GitHub
+  handle consistently.
+- macOS `.DS_Store` files are ignored to keep Finder metadata out of repository
+  changes.
+
 ## [1.0.0] - 2026-07-30
 
 ### Added
@@ -270,7 +290,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.3...v1.0.0
 [0.9.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.1...v0.9.2
