@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-08-04
+
+### Changed
+
+- GitHub Pages deployment now starts automatically after a stable GitHub
+  Release passes the full release workflow and public smoke tests.
+- Before building the website, the deployment verifies the source event, tag,
+  commit, `VERSION`, published release state, and exact runtime asset set.
+- Manual deployment by release tag remains available for reruns and rollbacks.
+
 ## [1.0.1] - 2026-08-03
 
 ### Added
@@ -290,7 +300,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.3...v1.0.0
 [0.9.3]: https://github.com/phoenixweiss/Bumpster/compare/v0.9.2...v0.9.3
