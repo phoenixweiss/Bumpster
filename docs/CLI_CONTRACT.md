@@ -24,7 +24,7 @@ asks for `major`, `minor`, or `patch`; an empty response selects `patch`.
 | --- | --- | --- |
 | `-h`, `--help` | No | Prints help and exits. |
 | `-v`, `--version` | No | Prints `Bumpster version: MAJOR.MINOR.PATCH`. |
-| `-u`, `--update` | No | Transactionally installs the latest stable GitHub Release runtime. |
+| `-u`, `--update` | No | Updates a standalone installation from the latest stable GitHub Release. Package-manager installations direct updates back to their package manager. |
 | `-s`, `--status` | Yes | Reads branch, working-tree, and upstream status without changing repository state. |
 | `-l`, `--create-local-config` | No | Interactively writes `./.bumpsterrc`. |
 | `-f`, `--create-feature` | Yes | Creates and checks out a local feature branch from the configured development branch. |
@@ -96,6 +96,11 @@ Documented Boolean values are `true` and `false`.
 `BUMPSTER_HOME` selects the runtime installation directory and defaults to
 `$HOME/.bumpster`. A custom value must be an absolute, non-broad, non-symlink
 target accepted by the installer and updater.
+
+The installation wrapper may set `BUMPSTER_INSTALL_METHOD` to identify a
+package manager. Homebrew installations set it to `homebrew`; in that mode
+`--update` returns a non-zero status without changing the Cellar and directs
+the user to `brew upgrade bumpster`.
 
 ## Hooks
 

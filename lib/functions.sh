@@ -679,6 +679,11 @@ update_bumpster() (
   runtime_archive_name=""
   runtime_release_version=""
 
+  if [[ "${BUMPSTER_INSTALL_METHOD:-standalone}" == "homebrew" ]]; then
+    log "Bumpster is managed by Homebrew. Use 'brew upgrade bumpster' to update." "ERROR"
+    return 1
+  fi
+
   trap runtime_update_cleanup EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM

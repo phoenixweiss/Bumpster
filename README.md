@@ -239,6 +239,10 @@ rename operations, recreates the command wrappers, and retains the previous
 runtime at the backup path printed on success. Any failure after activation
 starts restores the previous installation and returns a non-zero status.
 
+For a Homebrew installation, use `brew upgrade bumpster`. The `--update`
+command does not replace files managed by Homebrew and instead points back to
+that command.
+
 ### Customizing Branch Names
 
 You can specify custom branch names in a configuration file. Default branch

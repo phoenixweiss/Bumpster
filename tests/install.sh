@@ -693,6 +693,38 @@ test_self_update_rejects_downgrade() {
   assert_no_temporary_directories "$home_dir"
 }
 
+test_homebrew_update_uses_package_manager() {
+  local test_root="$suite_root/homebrew-update"
+  local home_dir="$test_root/home"
+  local target_home="$home_dir/.bumpster"
+  local release_dir
+  local output
+
+  mkdir -p "$home_dir" || return 1
+  release_dir="$(create_release_fixture homebrew-update-release 0.9.0)" ||
+    return 1
+  run_installer "$home_dir" "$target_home" "$release_dir" >/dev/null ||
+    return 1
+
+  if output="$(
+    HOME="$home_dir" \
+      BUMPSTER_INSTALL_METHOD=homebrew \
+      BUMPSTER_RELEASE_DOWNLOAD_URL="https://example.invalid/releases/latest/download" \
+      PATH="$target_home/bin:$runtime_path" \
+      "$target_home/bin/bumpster" --update 2>&1
+  )"; then
+    fail "Homebrew-managed self-update unexpectedly succeeded"
+    return 1
+  fi
+
+  assert_equal "Bumpster version: 0.9.0" \
+    "$(installed_version "$home_dir" "$target_home")" \
+    "Rejected Homebrew self-update changed the installed version" || return 1
+  assert_contains "$output" "Use 'brew upgrade bumpster' to update." \
+    "Homebrew update guidance is missing" || return 1
+  assert_no_temporary_directories "$home_dir"
+}
+
 test_unsafe_home_is_rejected() {
   local test_root="$suite_root/unsafe-home"
   local home_dir="$test_root/home"
@@ -770,6 +802,8 @@ main() {
     test_self_update_noop_is_clean
   run_test "self-update rejects a downgrade" \
     test_self_update_rejects_downgrade
+  run_test "Homebrew-managed updates use the package manager" \
+    test_homebrew_update_uses_package_manager
   run_test "unsafe BUMPSTER_HOME is rejected before mutation" \
     test_unsafe_home_is_rejected
 
