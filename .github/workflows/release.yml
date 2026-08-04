@@ -300,3 +300,44 @@ jobs:
     uses: ./.github/workflows/release-smoke.yml
     with:
       expected_tag: ${{ github.ref_name }}
+
+  homebrew:
+    name: Request Homebrew update
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Dispatch Formula update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          TAP_REPOSITORY: phoenixweiss/homebrew-bumpster
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            printf 'HOMEBREW_TAP_TOKEN is not configured.\n' >&2
+            exit 1
+          fi
+
+          jq -n \
+            --arg repository "$SOURCE_REPOSITORY" \
+            --arg tag "$RELEASE_TAG" \
+            --arg commit "$RELEASE_COMMIT" \
+            '{
+              event_type: "bumpster-release",
+              client_payload: {
+                repository: $repository,
+                tag: $tag,
+                commit: $commit
+              }
+            }' > "$RUNNER_TEMP/homebrew-dispatch.json"
+
+          gh api \
+            --method POST \
+            "repos/$TAP_REPOSITORY/dispatches" \
+            --input "$RUNNER_TEMP/homebrew-dispatch.json"
