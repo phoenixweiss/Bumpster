@@ -10,10 +10,13 @@ import {
   configExample,
   createTerminalLines,
   featureExample,
+  homebrewInstallCommand,
+  homebrewUninstallCommand,
+  homebrewUpdateCommand,
   hooksExample,
-  installCommand,
   pathCommand,
-  uninstallCommand,
+  standaloneInstallCommand,
+  standaloneUninstallCommand,
 } from "../src/data/examples.js";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -143,8 +146,23 @@ for (const [releaseType, [shortOption, longOption]] of Object.entries(
 for (const documentation of [readme, readmeRu]) {
   assertIncludes(
     documentation,
-    installCommand,
-    "Installation command differs from README",
+    homebrewInstallCommand,
+    "Homebrew installation command differs from README",
+  );
+  assertIncludes(
+    documentation,
+    homebrewUpdateCommand,
+    "Homebrew update command differs from README",
+  );
+  assertIncludes(
+    documentation,
+    homebrewUninstallCommand,
+    "Homebrew uninstall command differs from README",
+  );
+  assertIncludes(
+    documentation,
+    standaloneInstallCommand,
+    "Standalone installation command differs from README",
   );
   assertIncludes(
     documentation,
@@ -159,8 +177,8 @@ for (const documentation of [readme, readmeRu]) {
 }
 
 assert(
-  uninstallCommand === 'rm -rf -- "$HOME/.bumpster"',
-  "Website uninstall command changed unexpectedly.",
+  standaloneUninstallCommand === 'rm -rf -- "$HOME/.bumpster"',
+  "Website standalone uninstall command changed unexpectedly.",
 );
 
 const configurationKeys = configExample

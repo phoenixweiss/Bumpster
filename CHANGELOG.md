@@ -17,14 +17,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `BUMPSTER_INSTALL_METHOD=homebrew`.
 - Installation tests cover the Homebrew update path and verify that it leaves
   the installed runtime unchanged.
+- The bilingual website now switches between Homebrew and standalone install,
+  follow-up, and uninstall commands without mixing their filesystem layouts.
 
 ### Changed
 
 - `bumpster --update` now refuses to replace files managed by Homebrew and
   directs the user to `brew upgrade bumpster`. The transactional updater for
   standalone installations is unchanged.
-- The English and Russian README and CLI contract describe the different update
-  commands for standalone and Homebrew installations.
+- The English and Russian README, website, and CLI contract describe the
+  different install, update, and uninstall paths for standalone and Homebrew
+  installations.
 
 ## [1.0.2] - 2026-08-04
 

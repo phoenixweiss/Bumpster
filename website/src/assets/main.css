@@ -856,6 +856,10 @@ a {
   background: var(--panel);
 }
 
+.install-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .guide-tabs button {
   min-height: 42px;
   padding: 9px 12px;
@@ -925,6 +929,10 @@ a {
 
 .footprint-copy > p {
   margin-top: 27px;
+}
+
+.footprint-tabs {
+  margin-top: 25px;
 }
 
 .package-card {

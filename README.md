@@ -26,14 +26,40 @@
 - Local and global configuration files for flexibility.
 - Optional logging for supported operations.
 - Custom hooks (pre-bump/post-bump) for project-specific workflows.
-- Minimal footprint: installed in `~/.bumpster`.
-- Easy removal: delete the `.bumpster` directory to uninstall.
+- Minimal footprint: managed by Homebrew or installed under `~/.bumpster`.
+- Easy removal through Homebrew or by deleting the standalone directory.
 - Cross-platform compatibility (Linux, macOS, and Git Bash on Windows).
 - Supports optional synchronization of the `VERSION` file with `package.json`.
 
 ## Installation
 
-Install Bumpster with a single command:
+### Homebrew
+
+On macOS or Linux with Homebrew, install Bumpster from its official tap:
+
+```bash
+brew install phoenixweiss/bumpster/bumpster
+```
+
+This single command adds the `phoenixweiss/bumpster` tap and installs the
+latest stable release. Once the tap is present, the shorter command also works:
+
+```bash
+brew install bumpster
+```
+
+Homebrew provides both `bumpster` and `bump`, keeps the runtime in its Cellar,
+and manages upgrades and removal without requiring a manual PATH change.
+
+The unqualified `brew install bumpster` works on a fresh Homebrew installation
+only after Bumpster is accepted into `homebrew-core`. Until then, use the
+fully qualified one-command install above or add the tap first with
+`brew tap phoenixweiss/bumpster`.
+
+### Standalone installer
+
+For Linux, macOS, Git Bash, or systems where you do not want to use Homebrew,
+install Bumpster with:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"
@@ -532,7 +558,13 @@ messages use short, simple English.
 
 ## Uninstalling Bumpster
 
-Remove the installed runtime and command wrappers with:
+Remove a Homebrew installation with:
+
+```bash
+brew uninstall bumpster
+```
+
+Remove a standalone installation and its command wrappers with:
 
 ```bash
 rm -rf -- "$HOME/.bumpster"

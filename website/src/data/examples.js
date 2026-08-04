@@ -1,10 +1,17 @@
-export const installCommand =
+export const homebrewInstallCommand =
+  "brew install phoenixweiss/bumpster/bumpster";
+
+export const homebrewUpdateCommand = "brew upgrade bumpster";
+
+export const homebrewUninstallCommand = "brew uninstall bumpster";
+
+export const standaloneInstallCommand =
   '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"';
 
 export const pathCommand =
   "echo 'export PATH=\"$HOME/.bumpster/bin:$PATH\"' >> ~/.bashrc";
 
-export const uninstallCommand = 'rm -rf -- "$HOME/.bumpster"';
+export const standaloneUninstallCommand = 'rm -rf -- "$HOME/.bumpster"';
 
 export const bumpOptions = {
   patch: {

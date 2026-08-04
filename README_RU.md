@@ -26,14 +26,39 @@
 - Локальные и глобальные конфигурационные файлы для гибкости.
 - Опциональное логирование поддерживаемых операций.
 - Пользовательские хуки (`pre-bump`/`post-bump`) для расширения сценариев.
-- Минимальный след: устанавливается в `~/.bumpster`.
-- Легкое удаление: достаточно удалить директорию `.bumpster`.
+- Минимальный след: управляется Homebrew либо устанавливается в `~/.bumpster`.
+- Простое удаление через Homebrew или удалением директории обычной установки.
 - Кроссплатформенная совместимость (Linux, macOS и Git Bash на Windows).
 - Поддержка опциональной синхронизации файла `VERSION` с `package.json`.
 
 ## Установка
 
-Установить Bumpster можно одной командой:
+### Homebrew
+
+На macOS или Linux с Homebrew установите Bumpster из официального tap:
+
+```bash
+brew install phoenixweiss/bumpster/bumpster
+```
+
+Эта команда сама добавляет tap `phoenixweiss/bumpster` и устанавливает последний
+стабильный релиз. После добавления tap работает и короткий вариант:
+
+```bash
+brew install bumpster
+```
+
+Homebrew предоставляет обе команды — `bumpster` и `bump`, хранит runtime в
+своём Cellar и управляет обновлением и удалением без ручной настройки PATH.
+
+На чистой установке Homebrew команда `brew install bumpster` без имени tap
+будет доступна только после принятия Bumpster в `homebrew-core`. До этого
+используйте полную команду выше либо сначала выполните
+`brew tap phoenixweiss/bumpster`.
+
+### Установочный скрипт
+
+На Linux, macOS, Git Bash или без Homebrew установите Bumpster командой:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixweiss/Bumpster/main/install.sh)"
@@ -534,7 +559,13 @@ Checksum подтверждает байты загруженного файла
 
 ## Удаление Bumpster
 
-Удалить установленный runtime и command wrappers можно командой:
+Установка через Homebrew удаляется командой:
+
+```bash
+brew uninstall bumpster
+```
+
+Установленный скриптом runtime и его command wrappers удаляются командой:
 
 ```bash
 rm -rf -- "$HOME/.bumpster"

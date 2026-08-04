@@ -14,8 +14,8 @@ export const content = {
       title: ["Release versions", "with ease"],
       lead: "Bumpster checks your Git state, updates the version, creates the tag, and publishes every release ref in one guarded flow.",
       install: "Install Bumpster",
-      explore: "See the release flow",
-      note: "Linux · macOS · Git Bash",
+      explore: "See CLI reference",
+      note: "Homebrew or installer · Linux · macOS · Git Bash",
     },
     terminal: {
       label: "release.sh",
@@ -25,7 +25,7 @@ export const content = {
     facts: [
       ["RUNTIME", "Bash + Git"],
       ["SAFETY", "Atomic Git push"],
-      ["INSTALL", "Verified Release asset"],
+      ["INSTALL", "Homebrew or verified asset"],
       ["LICENSE", "MIT"],
     ],
     why: {
@@ -47,7 +47,7 @@ export const content = {
         {
           index: "03",
           title: "Small on purpose",
-          text: "The installer downloads a checksummed runtime asset containing only the CLI files. No docs, tests, CI, or website source follows it home.",
+          text: "Homebrew and the standalone installer keep only the CLI runtime. No docs, tests, CI, or website source follows it home.",
         },
       ],
     },
@@ -84,8 +84,15 @@ export const content = {
     start: {
       eyebrow: "QUICK START",
       title: "From zero to the next release.",
-      installTitle: "Install the latest stable release",
-      pathTitle: "Add the command to PATH",
+      methodLabel: "Choose an installation method",
+      homebrewTab: "Homebrew",
+      standaloneTab: "Standalone installer",
+      homebrewInstallTitle: "Install from the Bumpster tap",
+      homebrewSecondTitle: "Update later with Homebrew",
+      homebrewNote:
+        "The full install command adds the tap automatically. After that, `brew install bumpster` works. A fresh Homebrew installation needs the tap until Bumpster reaches `homebrew-core`.",
+      standaloneInstallTitle: "Install the latest stable release",
+      standaloneSecondTitle: "Add the command to PATH",
       releaseTitle: "Run a patch release",
       copy: "Copy",
       copied: "Copied",
@@ -105,7 +112,7 @@ export const content = {
         ["-s", "--status", "Read repository status"],
         ["-f", "--create-feature", "Start a feature branch"],
         ["-c", "--close-feature", "Merge and close a feature"],
-        ["-u", "--update", "Install the latest stable release"],
+        ["-u", "--update", "Update a standalone installation"],
         ["-l", "--create-local-config", "Create project configuration"],
       ],
       contract: "Full CLI contract",
@@ -128,9 +135,10 @@ export const content = {
     },
     footprint: {
       eyebrow: "EASY TO REMOVE",
-      title: "Small install. One-folder uninstall.",
-      text: "Bumpster installs only its verified runtime and command wrappers under `~/.bumpster`. It is quick to put in place and just as easy to remove: delete that directory and the installed CLI is gone.",
-      package: "~/.bumpster/",
+      title: "Small install. Easy uninstall.",
+      text: "Homebrew keeps the verified runtime in its Cellar; the standalone installer uses `~/.bumpster`. Both methods install only the CLI files and are removed with one command.",
+      packageHomebrew: "Homebrew Cellar / bumpster",
+      packageStandalone: "~/.bumpster/",
       contents: "WHAT GETS INSTALLED",
       runtimeFiles: [
         ["bin/", "command wrappers"],
@@ -173,8 +181,8 @@ export const content = {
       title: ["Выпускайте версии", "легко"],
       lead: "Bumpster проверяет состояние Git, обновляет версию, создаёт тег и публикует все refs релиза одним защищённым процессом.",
       install: "Установить Bumpster",
-      explore: "Посмотреть процесс",
-      note: "Linux · macOS · Git Bash",
+      explore: "Посмотреть команды",
+      note: "Homebrew или установочный скрипт · Linux · macOS · Git Bash",
     },
     terminal: {
       label: "release.sh",
@@ -184,7 +192,7 @@ export const content = {
     facts: [
       ["СРЕДА", "Bash + Git"],
       ["БЕЗОПАСНОСТЬ", "Атомарный Git push"],
-      ["УСТАНОВКА", "Проверенный Release asset"],
+      ["УСТАНОВКА", "Homebrew или проверенный архив"],
       ["ЛИЦЕНЗИЯ", "MIT"],
     ],
     why: {
@@ -206,7 +214,7 @@ export const content = {
         {
           index: "03",
           title: "Ничего лишнего",
-          text: "Installer скачивает runtime asset с checksum, содержащий только файлы CLI. Документация, тесты, CI и сайт на машину не попадут.",
+          text: "Homebrew и установочный скрипт оставляют только файлы CLI. Документация, тесты, CI и сайт на машину не попадут.",
         },
       ],
     },
@@ -243,8 +251,15 @@ export const content = {
     start: {
       eyebrow: "БЫСТРЫЙ СТАРТ",
       title: "От установки до следующего релиза.",
-      installTitle: "Установите последний стабильный релиз",
-      pathTitle: "Добавьте команду в PATH",
+      methodLabel: "Выберите способ установки",
+      homebrewTab: "Homebrew",
+      standaloneTab: "Установка скриптом",
+      homebrewInstallTitle: "Установите через Homebrew tap",
+      homebrewSecondTitle: "Обновляйте через Homebrew",
+      homebrewNote:
+        "Полная команда сама добавляет tap. После этого работает `brew install bumpster`. На чистой установке Homebrew tap будет нужен, пока Bumpster не попадёт в `homebrew-core`.",
+      standaloneInstallTitle: "Установите последний стабильный релиз",
+      standaloneSecondTitle: "Добавьте команду в PATH",
       releaseTitle: "Запустите patch-релиз",
       copy: "Копировать",
       copied: "Скопировано",
@@ -264,7 +279,7 @@ export const content = {
         ["-s", "--status", "Показать состояние репозитория"],
         ["-f", "--create-feature", "Начать feature-ветку"],
         ["-c", "--close-feature", "Влить и закрыть feature-ветку"],
-        ["-u", "--update", "Установить последний стабильный релиз"],
+        ["-u", "--update", "Обновить установку скриптом"],
         ["-l", "--create-local-config", "Создать конфигурацию проекта"],
       ],
       contract: "Полный контракт CLI",
@@ -287,9 +302,10 @@ export const content = {
     },
     footprint: {
       eyebrow: "ЛЕГКО УДАЛИТЬ",
-      title: "Компактная установка. Удаление одной папкой.",
-      text: "Bumpster устанавливает только проверенный runtime и command wrappers в `~/.bumpster`. Поставить его просто, а удалить ещё проще: удалите эту директорию — и установленной CLI больше нет.",
-      package: "~/.bumpster/",
+      title: "Компактная установка. Простое удаление.",
+      text: "Homebrew хранит проверенный runtime в своём Cellar, а установочный скрипт — в `~/.bumpster`. Оба способа устанавливают только файлы CLI и удаляются одной командой.",
+      packageHomebrew: "Homebrew Cellar / bumpster",
+      packageStandalone: "~/.bumpster/",
       contents: "ЧТО УСТАНАВЛИВАЕТСЯ",
       runtimeFiles: [
         ["bin/", "command wrappers"],

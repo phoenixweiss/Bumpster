@@ -7,10 +7,13 @@ import {
   configExample,
   createTerminalLines,
   featureExample,
+  homebrewInstallCommand,
+  homebrewUninstallCommand,
+  homebrewUpdateCommand,
   hooksExample,
-  installCommand,
   pathCommand,
-  uninstallCommand,
+  standaloneInstallCommand,
+  standaloneUninstallCommand,
 } from "@/data/examples";
 
 const props = defineProps({
@@ -23,6 +26,7 @@ const props = defineProps({
 const releaseType = ref("patch");
 const copiedKey = ref("");
 const activeGuide = ref("config");
+const installMethod = ref("homebrew");
 
 const t = computed(() => content[props.locale] ?? content.en);
 const release = computed(() => bumpOptions[releaseType.value]);
@@ -46,6 +50,28 @@ const contractUrl = computed(() =>
     ? "https://github.com/phoenixweiss/Bumpster/blob/main/docs/CLI_CONTRACT_RU.md"
     : "https://github.com/phoenixweiss/Bumpster/blob/main/docs/CLI_CONTRACT.md",
 );
+
+const installation = computed(() => {
+  if (installMethod.value === "standalone") {
+    return {
+      installTitle: t.value.start.standaloneInstallTitle,
+      secondTitle: t.value.start.standaloneSecondTitle,
+      installCommand: standaloneInstallCommand,
+      secondCommand: pathCommand,
+      packageLabel: t.value.footprint.packageStandalone,
+      uninstallCommand: standaloneUninstallCommand,
+    };
+  }
+
+  return {
+    installTitle: t.value.start.homebrewInstallTitle,
+    secondTitle: t.value.start.homebrewSecondTitle,
+    installCommand: homebrewInstallCommand,
+    secondCommand: homebrewUpdateCommand,
+    packageLabel: t.value.footprint.packageHomebrew,
+    uninstallCommand: homebrewUninstallCommand,
+  };
+});
 
 const guide = computed(() => {
   const guides = {
@@ -147,15 +173,11 @@ async function copyText(key, value) {
           </h1>
           <p class="hero-lead">{{ t.hero.lead }}</p>
           <div class="hero-actions">
-            <button
-              class="button button-primary"
-              type="button"
-              @click="copyText('hero', installCommand)"
-            >
-              <span aria-hidden="true">$</span>
-              {{ copiedKey === "hero" ? t.start.copied : t.hero.install }}
-            </button>
-            <a class="button button-quiet" href="#flow">
+            <a class="button button-primary" href="#start">
+              {{ t.hero.install }}
+              <span aria-hidden="true">↓</span>
+            </a>
+            <a class="button button-quiet" href="#commands">
               {{ t.hero.explore }}
               <span aria-hidden="true">↓</span>
             </a>
@@ -289,24 +311,59 @@ async function copyText(key, value) {
       </div>
     </section>
 
-    <section class="section start-section">
+    <section id="start" class="section start-section">
       <div class="shell">
-        <div class="section-heading">
-          <p class="eyebrow">{{ t.start.eyebrow }}</p>
-          <h2>{{ t.start.title }}</h2>
+        <div class="section-heading split-heading start-heading">
+          <div>
+            <p class="eyebrow">{{ t.start.eyebrow }}</p>
+            <h2>{{ t.start.title }}</h2>
+          </div>
+          <div
+            class="guide-tabs install-tabs"
+            role="tablist"
+            :aria-label="t.start.methodLabel"
+          >
+            <button
+              id="homebrew-install-tab"
+              type="button"
+              role="tab"
+              :aria-selected="installMethod === 'homebrew'"
+              aria-controls="install-panel"
+              :class="{ active: installMethod === 'homebrew' }"
+              @click="installMethod = 'homebrew'"
+            >
+              {{ t.start.homebrewTab }}
+            </button>
+            <button
+              id="standalone-install-tab"
+              type="button"
+              role="tab"
+              :aria-selected="installMethod === 'standalone'"
+              aria-controls="install-panel"
+              :class="{ active: installMethod === 'standalone' }"
+              @click="installMethod = 'standalone'"
+            >
+              {{ t.start.standaloneTab }}
+            </button>
+          </div>
         </div>
 
-        <div class="command-stack">
+        <div
+          id="install-panel"
+          class="command-stack"
+          role="tabpanel"
+          :aria-labelledby="`${installMethod}-install-tab`"
+        >
           <article class="command-block">
             <div>
               <span>01</span>
-              <h3>{{ t.start.installTitle }}</h3>
+              <h3>{{ installation.installTitle }}</h3>
             </div>
             <div class="code-row">
-              <code>{{ installCommand }}</code>
+              <code>{{ installation.installCommand }}</code>
               <button
                 type="button"
-                @click="copyText('install', installCommand)"
+                @click="copyText('install', installation.installCommand)"
               >
                 {{ copiedKey === "install" ? t.start.copied : t.start.copy }}
               </button>
@@ -315,11 +372,14 @@ async function copyText(key, value) {
           <article class="command-block">
             <div>
               <span>02</span>
-              <h3>{{ t.start.pathTitle }}</h3>
+              <h3>{{ installation.secondTitle }}</h3>
             </div>
             <div class="code-row">
-              <code>{{ pathCommand }}</code>
-              <button type="button" @click="copyText('path', pathCommand)">
+              <code>{{ installation.secondCommand }}</code>
+              <button
+                type="button"
+                @click="copyText('path', installation.secondCommand)"
+              >
                 {{ copiedKey === "path" ? t.start.copied : t.start.copy }}
               </button>
             </div>
@@ -341,9 +401,20 @@ async function copyText(key, value) {
           </article>
         </div>
 
-        <aside class="migration-note">
-          <span aria-hidden="true">!</span>
-          <p>
+        <aside class="migration-note install-note">
+          <span aria-hidden="true">{{
+            installMethod === "homebrew" ? "i" : "!"
+          }}</span>
+          <p v-if="installMethod === 'homebrew'">
+            <template
+              v-for="(part, index) in inlineCodeParts(t.start.homebrewNote)"
+              :key="index"
+            >
+              <code v-if="part.code" class="inline-code">{{ part.text }}</code>
+              <span v-else>{{ part.text }}</span>
+            </template>
+          </p>
+          <p v-else>
             {{ t.start.migration }}
             <a
               :href="`${readmeUrl}#${props.locale === 'ru' ? 'переход-с-08x' : 'migrating-from-08x'}`"
@@ -463,12 +534,45 @@ async function copyText(key, value) {
               <span v-else>{{ part.text }}</span>
             </template>
           </p>
+          <div
+            class="guide-tabs install-tabs footprint-tabs"
+            role="tablist"
+            :aria-label="t.start.methodLabel"
+          >
+            <button
+              id="homebrew-footprint-tab"
+              type="button"
+              role="tab"
+              :aria-selected="installMethod === 'homebrew'"
+              aria-controls="footprint-panel"
+              :class="{ active: installMethod === 'homebrew' }"
+              @click="installMethod = 'homebrew'"
+            >
+              {{ t.start.homebrewTab }}
+            </button>
+            <button
+              id="standalone-footprint-tab"
+              type="button"
+              role="tab"
+              :aria-selected="installMethod === 'standalone'"
+              aria-controls="footprint-panel"
+              :class="{ active: installMethod === 'standalone' }"
+              @click="installMethod = 'standalone'"
+            >
+              {{ t.start.standaloneTab }}
+            </button>
+          </div>
         </div>
 
-        <div class="package-card">
+        <div
+          id="footprint-panel"
+          class="package-card"
+          role="tabpanel"
+          :aria-labelledby="`${installMethod}-footprint-tab`"
+        >
           <div class="package-title">
             <span aria-hidden="true">▣</span>
-            <strong>{{ t.footprint.package }}</strong>
+            <strong>{{ installation.packageLabel }}</strong>
           </div>
           <div class="runtime-tree">
             <span class="package-label">{{ t.footprint.contents }}</span>
@@ -485,11 +589,11 @@ async function copyText(key, value) {
           <div class="uninstall-row">
             <div>
               <span>{{ t.footprint.uninstall }}</span>
-              <code>{{ uninstallCommand }}</code>
+              <code>{{ installation.uninstallCommand }}</code>
             </div>
             <button
               type="button"
-              @click="copyText('uninstall', uninstallCommand)"
+              @click="copyText('uninstall', installation.uninstallCommand)"
             >
               {{ copiedKey === "uninstall" ? t.start.copied : t.start.copy }}
             </button>
@@ -509,14 +613,10 @@ async function copyText(key, value) {
         <p class="eyebrow">{{ t.closing.eyebrow }}</p>
         <h2>{{ t.closing.title }}</h2>
         <div class="closing-actions">
-          <button
-            class="button button-light"
-            type="button"
-            @click="copyText('closing', installCommand)"
-          >
-            <span aria-hidden="true">$</span>
-            {{ copiedKey === "closing" ? t.start.copied : t.closing.install }}
-          </button>
+          <a class="button button-light" href="#start">
+            {{ t.closing.install }}
+            <span aria-hidden="true">↑</span>
+          </a>
           <a
             class="button button-outline"
             href="https://github.com/phoenixweiss/Bumpster"
