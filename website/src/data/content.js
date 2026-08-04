@@ -90,7 +90,7 @@ export const content = {
       homebrewInstallTitle: "Install from the Bumpster tap",
       homebrewSecondTitle: "Update later with Homebrew",
       homebrewNote:
-        "The full install command adds the tap automatically. After that, `brew install bumpster` works. A fresh Homebrew installation needs the tap until Bumpster reaches `homebrew-core`.",
+        "The full command adds the tap and installs the selected Formula. The short `brew install bumpster` also needs explicit Formula trust: `brew trust --formula phoenixweiss/bumpster/bumpster`. Until Bumpster reaches `homebrew-core`, the full command is the simplest option.",
       standaloneInstallTitle: "Install the latest stable release",
       standaloneSecondTitle: "Add the command to PATH",
       releaseTitle: "Run a patch release",
@@ -182,7 +182,7 @@ export const content = {
       lead: "Bumpster проверяет состояние Git, обновляет версию, создаёт тег и публикует все refs релиза одним защищённым процессом.",
       install: "Установить Bumpster",
       explore: "Посмотреть команды",
-      note: "Homebrew или установочный скрипт · Linux · macOS · Git Bash",
+      note: "Homebrew или скрипт · Linux · macOS · Git Bash",
     },
     terminal: {
       label: "release.sh",
@@ -257,7 +257,7 @@ export const content = {
       homebrewInstallTitle: "Установите через Homebrew tap",
       homebrewSecondTitle: "Обновляйте через Homebrew",
       homebrewNote:
-        "Полная команда сама добавляет tap. После этого работает `brew install bumpster`. На чистой установке Homebrew tap будет нужен, пока Bumpster не попадёт в `homebrew-core`.",
+        "Полная команда сама добавляет tap и устанавливает выбранную Formula. Для короткой `brew install bumpster` нужно явно доверить Formula: `brew trust --formula phoenixweiss/bumpster/bumpster`. Пока Bumpster не попадёт в `homebrew-core`, проще использовать полную команду.",
       standaloneInstallTitle: "Установите последний стабильный релиз",
       standaloneSecondTitle: "Добавьте команду в PATH",
       releaseTitle: "Запустите patch-релиз",

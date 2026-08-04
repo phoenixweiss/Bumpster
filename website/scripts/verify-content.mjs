@@ -11,6 +11,7 @@ import {
   createTerminalLines,
   featureExample,
   homebrewInstallCommand,
+  homebrewTrustCommand,
   homebrewUninstallCommand,
   homebrewUpdateCommand,
   hooksExample,
@@ -156,6 +157,11 @@ for (const documentation of [readme, readmeRu]) {
   );
   assertIncludes(
     documentation,
+    homebrewTrustCommand,
+    "Homebrew trust command differs from README",
+  );
+  assertIncludes(
+    documentation,
     homebrewUninstallCommand,
     "Homebrew uninstall command differs from README",
   );
@@ -173,6 +179,14 @@ for (const documentation of [readme, readmeRu]) {
     documentation,
     "~/.bumpster",
     "Installation directory is missing from README",
+  );
+}
+
+for (const locale of [content.en, content.ru]) {
+  assertIncludes(
+    locale.start.homebrewNote,
+    homebrewTrustCommand,
+    "Homebrew trust command is missing from website guidance",
   );
 }
 

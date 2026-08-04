@@ -1,6 +1,9 @@
 export const homebrewInstallCommand =
   "brew install phoenixweiss/bumpster/bumpster";
 
+export const homebrewTrustCommand =
+  "brew trust --formula phoenixweiss/bumpster/bumpster";
+
 export const homebrewUpdateCommand = "brew upgrade bumpster";
 
 export const homebrewUninstallCommand = "brew uninstall bumpster";

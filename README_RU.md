@@ -42,19 +42,24 @@ brew install phoenixweiss/bumpster/bumpster
 ```
 
 Эта команда сама добавляет tap `phoenixweiss/bumpster` и устанавливает последний
-стабильный релиз. После добавления tap работает и короткий вариант:
+стабильный релиз. Полное имя доверяет только выбранной Formula, а не всему
+стороннему tap.
+
+Чтобы использовать короткую команду, сначала добавьте tap и явно доверьте
+Homebrew только Formula Bumpster:
 
 ```bash
+brew tap phoenixweiss/bumpster
+brew trust --formula phoenixweiss/bumpster/bumpster
 brew install bumpster
 ```
 
 Homebrew предоставляет обе команды — `bumpster` и `bump`, хранит runtime в
 своём Cellar и управляет обновлением и удалением без ручной настройки PATH.
 
-На чистой установке Homebrew команда `brew install bumpster` без имени tap
-будет доступна только после принятия Bumpster в `homebrew-core`. До этого
-используйте полную команду выше либо сначала выполните
-`brew tap phoenixweiss/bumpster`.
+Без явного доверия Formula команда `brew install bumpster` без имени tap будет
+доступна на чистой установке Homebrew только после принятия Bumpster в
+`homebrew-core`. До этого проще всего использовать полную команду выше.
 
 ### Установочный скрипт
 

@@ -42,19 +42,25 @@ brew install phoenixweiss/bumpster/bumpster
 ```
 
 This single command adds the `phoenixweiss/bumpster` tap and installs the
-latest stable release. Once the tap is present, the shorter command also works:
+latest stable release. The fully qualified name trusts only the selected
+Formula, not the whole third-party tap.
+
+To use the shorter command, add the tap and explicitly trust the Bumpster
+Formula first:
 
 ```bash
+brew tap phoenixweiss/bumpster
+brew trust --formula phoenixweiss/bumpster/bumpster
 brew install bumpster
 ```
 
 Homebrew provides both `bumpster` and `bump`, keeps the runtime in its Cellar,
 and manages upgrades and removal without requiring a manual PATH change.
 
-The unqualified `brew install bumpster` works on a fresh Homebrew installation
-only after Bumpster is accepted into `homebrew-core`. Until then, use the
-fully qualified one-command install above or add the tap first with
-`brew tap phoenixweiss/bumpster`.
+Without the explicit Formula trust above, the unqualified
+`brew install bumpster` works on a fresh Homebrew installation only after
+Bumpster is accepted into `homebrew-core`. Until then, the fully qualified
+one-command install is the simplest option.
 
 ### Standalone installer
 

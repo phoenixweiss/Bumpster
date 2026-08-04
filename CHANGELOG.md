@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Homebrew guidance now reflects the tap trust required for short Formula names
+  by Homebrew 6.0 and later. The fully qualified one-command install remains the
+  recommended option.
+
 ## [1.1.0] - 2026-08-04
 
 ### Added
