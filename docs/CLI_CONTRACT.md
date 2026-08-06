@@ -29,35 +29,62 @@ asks for `major`, `minor`, or `patch`; an empty response selects `patch`.
 | `-l`, `--create-local-config` | No | Interactively writes `./.bumpsterrc`. |
 | `-f`, `--create-feature` | Yes | Creates and checks out a local feature branch from the configured development branch. |
 | `-c`, `--close-feature` | Yes | Merges the current feature branch into development, pushes development, and optionally deletes the feature branch. |
+| `-x`, `--create-hotfix` | Yes | Fetches the configured release branch and creates a local `hotfix/*` branch from it. |
 | `-M`, `--major` | Yes | Runs a major release. |
 | `-m`, `--minor` | Yes | Runs a minor release. |
 | `-p`, `--patch` | Yes | Runs a patch release. |
+| `-H`, `--hotfix` | Yes | Runs a patch release from a dedicated `hotfix/*` branch based on the release branch. |
 
 Help, version, update, and local configuration creation do not require a Git
-repository. Status, feature operations, and releases do.
+repository. Status, branch operations, and releases do.
+
+## Hotfix branch creation
+
+`-x` and `--create-hotfix` require a clean worktree and prompt for a short
+name. Bumpster fetches `origin`, safely fast-forwards the configured local
+release branch, and creates `hotfix/<name>` from that exact commit. If the
+release branch does not exist locally, it is created as a tracking branch from
+`origin`. An unpublished or divergent local release branch is never reset or
+overwritten; the command stops and leaves it unchanged.
 
 ## Release guarantees
 
-A release requires:
+Every release requires:
 
 - a clean working tree;
 - a valid `MAJOR.MINOR.PATCH` value in `VERSION`;
-- the configured `BEFORE_BUMP_BRANCH` checked out locally;
 - distinct configured development and release branches;
 - correct `origin` upstreams for existing release branches;
 - reachable and current remote refs;
 - no local or remote tag for the target version.
+
+A major, minor, or patch release also requires the configured
+`BEFORE_BUMP_BRANCH` to be checked out locally. A hotfix is always selected
+explicitly with `-H` or `--hotfix`; it is not part of the interactive prompt and
+ignores `BEFORE_BUMP_BRANCH`. It additionally requires:
+
+- an active non-empty `hotfix/*` branch containing the current release branch;
+- local development and release branches exactly matching their `origin` refs;
+- no unpublished development commits in the hotfix branch;
+- the same starting `VERSION` in the hotfix, development, and release branches.
 
 The release plan and package synchronization input are validated before the
 pre-bump hook and before the first release mutation. A successful release:
 
 1. updates `VERSION` and the optional root `package.json` version;
 2. creates `bump version to MAJOR.MINOR.PATCH`;
-3. fast-forwards the configured release branch from development;
+3. updates the configured release branch from development;
 4. creates an annotated `vMAJOR.MINOR.PATCH` tag;
 5. publishes development, release, and tag refs in one atomic push;
 6. returns to `AFTER_BUMP_BRANCH`;
 7. runs the post-bump hook.
+
+For a hotfix, step 3 is replaced by two guarded operations: Bumpster first
+merges the hotfix into development, then fast-forwards the release branch only
+to the hotfix commit. The annotated tag points to that release-branch commit,
+so unfinished development history is not published to production. Development,
+release, and tag refs still use one atomic push. The hotfix branch is not pushed
+or deleted automatically. `AFTER_BUMP_BRANCH` still controls the final checkout.
 
 Bumpster does not automatically roll back a partially completed local release.
 On failure it preserves state and reports recovery information. A post-bump
@@ -114,7 +141,8 @@ Hooks receive no positional arguments and run from the repository working
 directory with:
 
 - `BUMPSTER_PREV_VERSION`;
-- `BUMPSTER_NEW_VERSION`.
+- `BUMPSTER_NEW_VERSION`;
+- `BUMPSTER_RELEASE_TYPE` (`major`, `minor`, `patch`, or `hotfix`).
 
 `pre-bump` runs after release preflight and version calculation but before the
 first mutation. A non-zero status aborts the release. `post-bump` runs after

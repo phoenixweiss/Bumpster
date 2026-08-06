@@ -899,6 +899,8 @@ Usage:  bumpster [action]
         -M, --major                  Bump major version
         -m, --minor                  Bump minor version
         -p, --patch                  Bump patch version
+        -x, --create-hotfix          Create a hotfix branch from the release branch
+        -H, --hotfix                 Release a patch from a hotfix branch
         -u, --update                 Update Bumpster to the latest version
         -v, --version                Show current version
         -s, --status                 Show repository status
@@ -1238,7 +1240,7 @@ calculate_next_version() {
       minor=$((minor + 1))
       patch=0
       ;;
-    patch)
+    patch | hotfix)
       patch=$((patch + 1))
       ;;
     *)
@@ -1249,10 +1251,78 @@ calculate_next_version() {
   printf '%s.%s.%s\n' "$major" "$minor" "$patch"
 }
 
+# Validate the stricter branch topology required for a hotfix release.
+validate_hotfix_release() {
+  local develop_ref="refs/heads/$release_develop_branch"
+  local master_ref="refs/heads/$release_master_branch"
+  local remote_develop_ref="refs/remotes/origin/$release_develop_branch"
+  local remote_master_ref="refs/remotes/origin/$release_master_branch"
+  local master_sha=""
+  local hotfix_base=""
+  local develop_version=""
+  local master_version=""
+
+  log "Running hotfix branch checks."
+
+  case "$release_start_branch" in
+    hotfix/?*) ;;
+    *)
+      abort "Hotfix releases must be run from a 'hotfix/*' branch based on '$release_master_branch'."
+      ;;
+  esac
+
+  if ! git show-ref --verify --quiet "$develop_ref"; then
+    abort "Hotfix releases require a local development branch '$release_develop_branch'."
+  fi
+  if ! git show-ref --verify --quiet "$master_ref"; then
+    abort "Hotfix releases require a local release branch '$release_master_branch'."
+  fi
+  if ! git show-ref --verify --quiet "$remote_develop_ref"; then
+    abort "Hotfix releases require remote branch 'origin/$release_develop_branch'."
+  fi
+  if ! git show-ref --verify --quiet "$remote_master_ref"; then
+    abort "Hotfix releases require remote branch 'origin/$release_master_branch'."
+  fi
+
+  if [[ "$(git rev-parse "$develop_ref")" != "$(git rev-parse "$remote_develop_ref")" ]]; then
+    abort "Hotfix releases require local '$release_develop_branch' to match 'origin/$release_develop_branch' exactly."
+  fi
+
+  master_sha="$(git rev-parse "$master_ref")" ||
+    abort "Could not resolve release branch '$release_master_branch'."
+  if ! git merge-base --is-ancestor "$master_ref" "$release_start_branch"; then
+    abort "Hotfix branch '$release_start_branch' must contain the current '$release_master_branch' commit."
+  fi
+  if [[ "$(git rev-parse "$release_start_branch")" == "$master_sha" ]]; then
+    abort "Hotfix branch '$release_start_branch' does not contain a fix commit."
+  fi
+
+  hotfix_base="$(
+    git merge-base "$develop_ref" "$release_start_branch"
+  )" || abort "Could not compare the hotfix and development branches."
+  if [[ "$hotfix_base" != "$master_sha" ]]; then
+    abort "Hotfix branch '$release_start_branch' contains unpublished '$release_develop_branch' history."
+  fi
+
+  master_version="$(git show "$master_ref:VERSION" 2>/dev/null)" ||
+    abort "Could not read VERSION from '$release_master_branch'."
+  develop_version="$(git show "$develop_ref:VERSION" 2>/dev/null)" ||
+    abort "Could not read VERSION from '$release_develop_branch'."
+  if [[ "$release_current_version" != "$master_version" ]]; then
+    abort "Hotfix branch VERSION must match '$release_master_branch'."
+  fi
+  if [[ "$release_current_version" != "$develop_version" ]]; then
+    abort "Hotfix branch VERSION must match '$release_develop_branch'."
+  fi
+
+  log "Hotfix branch checks passed."
+}
+
 # Function to calculate and validate a release plan before local mutations
 prepare_release_plan() {
   local requested_type="${1:-}"
   local required_before_branch=""
+  local version_increment_type=""
   local worktree_status=""
 
   require_git_repository
@@ -1264,21 +1334,25 @@ prepare_release_plan() {
 
   release_develop_branch="${develop_branch:-$default_develop_branch}"
   release_master_branch="${master_branch:-$default_master_branch}"
-  required_before_branch="${before_bump_branch:-$release_develop_branch}"
-  if [[ -z "$required_before_branch" ]]; then
-    required_before_branch="$release_develop_branch"
-  fi
-  if ! git show-ref --verify --quiet "refs/heads/$required_before_branch"; then
-    abort "Configured BEFORE_BUMP_BRANCH '$required_before_branch' does not exist. Please create it or update your configuration."
-  fi
-
   release_start_branch="$(git rev-parse --abbrev-ref HEAD)" ||
     abort "Could not determine the current branch."
-  if [[ "$release_start_branch" != "$required_before_branch" ]]; then
-    abort "Version bumps must be run from '$required_before_branch' (current branch: '$release_start_branch')."
-  fi
-  if [[ "$release_start_branch" == "$release_master_branch" ]]; then
-    abort "BEFORE_BUMP_BRANCH must not be the configured release branch '$release_master_branch'."
+  release_is_hotfix="false"
+  if [[ "$requested_type" == "hotfix" ]]; then
+    release_is_hotfix="true"
+  else
+    required_before_branch="${before_bump_branch:-$release_develop_branch}"
+    if [[ -z "$required_before_branch" ]]; then
+      required_before_branch="$release_develop_branch"
+    fi
+    if ! git show-ref --verify --quiet "refs/heads/$required_before_branch"; then
+      abort "Configured BEFORE_BUMP_BRANCH '$required_before_branch' does not exist. Please create it or update your configuration."
+    fi
+    if [[ "$release_start_branch" != "$required_before_branch" ]]; then
+      abort "Version bumps must be run from '$required_before_branch' (current branch: '$release_start_branch')."
+    fi
+    if [[ "$release_start_branch" == "$release_master_branch" ]]; then
+      abort "BEFORE_BUMP_BRANCH must not be the configured release branch '$release_master_branch'."
+    fi
   fi
 
   default_dev_branch="$release_develop_branch"
@@ -1306,14 +1380,22 @@ prepare_release_plan() {
     release_version_type="${release_version_type:-patch}"
   fi
   case "$release_version_type" in
-    major | minor | patch) ;;
+    major | minor | patch)
+      version_increment_type="$release_version_type"
+      ;;
+    hotfix)
+      if [[ "$release_is_hotfix" != "true" ]]; then
+        abort "Hotfix releases must be selected explicitly with '-H' or '--hotfix'."
+      fi
+      version_increment_type="patch"
+      ;;
     *)
-      abort "Invalid version type. Please choose between 'major', 'minor', or 'patch'."
+      abort "Invalid version type. Please choose between 'major', 'minor', 'patch', or 'hotfix'."
       ;;
   esac
 
   release_new_version="$(
-    calculate_next_version "$release_current_version" "$release_version_type"
+    calculate_next_version "$release_current_version" "$version_increment_type"
   )" || abort "Could not calculate the next semantic version."
   if [[ "$release_current_version" == "$release_new_version" ]]; then
     abort "New version is the same as the current version."
@@ -1335,8 +1417,13 @@ prepare_release_plan() {
     "$release_develop_branch" \
     "$release_master_branch"
 
+  if [[ "$release_is_hotfix" == "true" ]]; then
+    validate_hotfix_release
+  fi
+
   export BUMPSTER_PREV_VERSION="$release_current_version"
   export BUMPSTER_NEW_VERSION="$release_new_version"
+  export BUMPSTER_RELEASE_TYPE="$release_version_type"
   log_highlighted \
     "Release plan: $release_current_version -> $release_new_version ($release_version_type)." \
     "$release_current_version" \
@@ -1382,6 +1469,29 @@ commit_release_version() {
 
 # Function to merge the prepared release branches and create the local tag
 create_release_refs() {
+  if [[ "$release_is_hotfix" == "true" ]]; then
+    release_stage="preparing the development branch"
+    check_or_create_branch "$release_develop_branch"
+
+    release_stage="merging the hotfix into the development branch"
+    log "Merging hotfix '$release_start_branch' into '$release_develop_branch'."
+    git merge "$release_start_branch" --no-edit ||
+      abort "Failed to merge hotfix '$release_start_branch' into '$release_develop_branch'."
+
+    release_stage="preparing the release branch"
+    check_or_create_branch "$release_master_branch"
+
+    release_stage="fast-forwarding the release branch to the hotfix"
+    log "Fast-forwarding '$release_master_branch' to hotfix '$release_start_branch'."
+    git merge --ff-only "$release_start_branch" ||
+      abort "Failed to fast-forward '$release_master_branch' to hotfix '$release_start_branch'."
+
+    release_stage="creating the release tag"
+    git tag -a "v$release_new_version" -m "Release $release_new_version" ||
+      abort "Failed to create release tag 'v$release_new_version'."
+    return
+  fi
+
   release_stage="preparing the development branch"
   check_or_create_branch "$release_develop_branch"
 
@@ -1483,6 +1593,86 @@ run_release() {
   prepare_release_plan "$requested_type"
   run_hook "pre-bump"
   execute_release_plan
+}
+
+# Function to create a hotfix branch from the current remote release branch
+create_hotfix() {
+  local release_branch="${master_branch:-$default_master_branch}"
+  local local_release_ref="refs/heads/$release_branch"
+  local remote_release_ref="refs/remotes/origin/$release_branch"
+  local current_branch=""
+  local hotfix_name=""
+  local hotfix_branch=""
+  local worktree_status=""
+
+  require_git_repository
+
+  current_branch="$(git branch --show-current)" ||
+    abort "Could not determine the current branch."
+  if [[ -z "$current_branch" ]]; then
+    abort "Cannot create a hotfix branch from detached HEAD."
+  fi
+
+  worktree_status="$(git status --porcelain)" ||
+    abort "Could not inspect the working tree."
+  if [[ -n "$worktree_status" ]]; then
+    abort "Working tree must be clean before creating a hotfix branch."
+  fi
+
+  if ! git check-ref-format --branch "$release_branch" >/dev/null 2>&1; then
+    abort "Configured release branch name '$release_branch' is invalid."
+  fi
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    abort "Remote 'origin' is not configured."
+  fi
+
+  log "Fetching the current release branch from origin."
+  git fetch --prune origin ||
+    abort "Failed to fetch current state from origin. Check its URL and access."
+  if ! git show-ref --verify --quiet "$remote_release_ref"; then
+    abort "Remote release branch 'origin/$release_branch' does not exist or was not fetched."
+  fi
+
+  while true; do
+    read -r -p "Enter a name for the hotfix: " hotfix_name ||
+      abort "Hotfix name input ended before a valid name was provided."
+    hotfix_name="${hotfix_name#hotfix/}"
+    hotfix_branch="hotfix/$hotfix_name"
+
+    if [[ -z "$hotfix_name" ]]; then
+      printf 'Hotfix name cannot be empty. Please try again.\n'
+    elif ! git check-ref-format --branch "$hotfix_branch" >/dev/null 2>&1; then
+      printf 'Invalid hotfix name. Please enter a valid Git branch suffix.\n'
+    elif git show-ref --verify --quiet "refs/heads/$hotfix_branch" ||
+      git show-ref --verify --quiet "refs/remotes/origin/$hotfix_branch"; then
+      abort "Hotfix branch '$hotfix_branch' already exists."
+    else
+      break
+    fi
+  done
+
+  if git show-ref --verify --quiet "$local_release_ref"; then
+    if ! git merge-base --is-ancestor "$local_release_ref" "$remote_release_ref"; then
+      abort "Local release branch '$release_branch' has unpublished or divergent commits. Resolve it before creating a hotfix."
+    fi
+
+    git branch --set-upstream-to="origin/$release_branch" "$release_branch" >/dev/null 2>&1 ||
+      abort "Failed to configure '$release_branch' to track 'origin/$release_branch'."
+    log "Switching to release branch '$release_branch'."
+    git checkout "$release_branch" ||
+      abort "Failed to switch to release branch '$release_branch'."
+    git merge --ff-only "$remote_release_ref" ||
+      abort "Failed to fast-forward '$release_branch' to 'origin/$release_branch'."
+  else
+    log "Creating local release branch '$release_branch' from origin."
+    git checkout -b "$release_branch" --track "origin/$release_branch" ||
+      abort "Failed to create release branch '$release_branch' from origin."
+  fi
+
+  log "Creating hotfix branch '$hotfix_branch' from '$release_branch'."
+  git checkout --no-track -b "$hotfix_branch" "$release_branch" ||
+    abort "Failed to create hotfix branch '$hotfix_branch'."
+  log "Hotfix branch '$hotfix_branch' created from 'origin/$release_branch'."
 }
 
 # Function to create a feature branch from the current dev branch

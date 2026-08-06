@@ -67,6 +67,13 @@ while [[ $# -gt 0 ]]; do
       select_cli_command "release" "$1"
       version_type="patch"
       ;;
+    -x | --create-hotfix)
+      select_cli_command "create-hotfix" "$1"
+      ;;
+    -H | --hotfix)
+      select_cli_command "release" "$1"
+      version_type="hotfix"
+      ;;
     -u | --update)
       select_cli_command "update" "$1"
       ;;
@@ -104,7 +111,7 @@ esac
 
 # Preload configuration for commands that depend on configured branch names
 case "$selected_command" in
-  status | create-feature | close-feature)
+  status | create-feature | close-feature | create-hotfix)
     if [ -f "$local_config_file" ]; then
       load_config "$local_config_file"
     elif [ -f "$global_config_file" ]; then
@@ -124,6 +131,10 @@ case "$selected_command" in
     ;;
   create-feature)
     create_feature
+    exit 0
+    ;;
+  create-hotfix)
+    create_hotfix
     exit 0
     ;;
   create-local-config)

@@ -10,6 +10,7 @@ import {
   configExample,
   createTerminalLines,
   featureExample,
+  hotfixExample,
   homebrewInstallCommand,
   homebrewTrustCommand,
   homebrewUninstallCommand,
@@ -127,6 +128,7 @@ const expectedReleaseOptions = {
   major: ["-M", "--major"],
   minor: ["-m", "--minor"],
   patch: ["-p", "--patch"],
+  hotfix: ["-H", "--hotfix"],
 };
 
 for (const [releaseType, [shortOption, longOption]] of Object.entries(
@@ -228,6 +230,7 @@ for (const hookValue of [
   ".bumpster/hooks/pre-bump",
   "BUMPSTER_PREV_VERSION",
   "BUMPSTER_NEW_VERSION",
+  "BUMPSTER_RELEASE_TYPE",
 ]) {
   assertIncludes(hooksExample, hookValue, "Hook example is incomplete");
   assertIncludes(contract, hookValue, "Hook example differs from CLI contract");
@@ -239,6 +242,7 @@ for (const implementationValue of [
   'run_hook "post-bump"',
   "BUMPSTER_PREV_VERSION",
   "BUMPSTER_NEW_VERSION",
+  "BUMPSTER_RELEASE_TYPE",
 ]) {
   assertIncludes(
     cliSource,
@@ -247,19 +251,24 @@ for (const implementationValue of [
   );
 }
 
-for (const featureCommand of [
+for (const branchCommand of [
   "bumpster --create-feature",
   "bumpster --close-feature",
 ]) {
-  assertIncludes(
-    featureExample,
-    featureCommand,
-    "Feature example is incomplete",
-  );
+  assertIncludes(featureExample, branchCommand, "Branch example is incomplete");
   assertIncludes(
     cliHelp,
-    featureCommand.replace("bumpster ", ""),
-    "Feature example differs from CLI help",
+    branchCommand.replace("bumpster ", ""),
+    "Branch example differs from CLI help",
+  );
+}
+
+for (const hotfixCommand of ["bumpster --create-hotfix", "bumpster --hotfix"]) {
+  assertIncludes(hotfixExample, hotfixCommand, "Hotfix example is incomplete");
+  assertIncludes(
+    cliHelp,
+    hotfixCommand.replace("bumpster ", ""),
+    "Hotfix example differs from CLI help",
   );
 }
 
@@ -278,6 +287,22 @@ for (const message of [
   "Returning to branch 'dev'.",
 ]) {
   assertIncludes(terminalText, message, "Terminal example is incomplete");
+}
+
+const hotfixTerminalText = createTerminalLines(bumpOptions.hotfix, "hotfix")
+  .map((line) => line.segments.map((segment) => segment.text).join(""))
+  .join("\n");
+
+for (const message of [
+  "Release plan: 1.4.2 -> 1.4.3 (hotfix).",
+  "Created version commit for 1.4.3.",
+  "Publishing 'dev', 'main', and tag 'v1.4.3' atomically.",
+]) {
+  assertIncludes(
+    hotfixTerminalText,
+    message,
+    "Hotfix terminal example is incomplete",
+  );
 }
 
 for (const sourceMessage of [

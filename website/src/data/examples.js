@@ -17,6 +17,12 @@ export const pathCommand =
 export const standaloneUninstallCommand = 'rm -rf -- "$HOME/.bumpster"';
 
 export const bumpOptions = {
+  hotfix: {
+    command: "bumpster --hotfix",
+    shortCommand: "bump -H",
+    previous: "1.4.2",
+    next: "1.4.3",
+  },
   patch: {
     command: "bumpster --patch",
     shortCommand: "bump -p",
@@ -108,6 +114,9 @@ printf 'Checking %s → %s\\n' \\
   "$BUMPSTER_PREV_VERSION" \\
   "$BUMPSTER_NEW_VERSION"
 
+printf 'Release type: %s\\n' \\
+  "$BUMPSTER_RELEASE_TYPE"
+
 npm test || exit 1`;
 
 export const featureExample = `bumpster --create-feature
@@ -116,3 +125,13 @@ git add .
 git commit -m "Add feature"
 
 bumpster --close-feature`;
+
+export const hotfixExample = `# Create hotfix/urgent-fix from the release branch
+bumpster --create-hotfix
+
+# Make, test, and commit the fix
+git add .
+git commit -m "Fix urgent issue"
+
+# Publish the patch release
+bumpster --hotfix`;

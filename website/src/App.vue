@@ -7,6 +7,7 @@ import {
   configExample,
   createTerminalLines,
   featureExample,
+  hotfixExample,
   homebrewInstallCommand,
   homebrewUninstallCommand,
   homebrewUpdateCommand,
@@ -89,6 +90,11 @@ const guide = computed(() => {
       title: t.value.configure.featureTitle,
       text: t.value.configure.featureText,
       code: featureExample,
+    },
+    hotfix: {
+      title: t.value.configure.hotfixTitle,
+      text: t.value.configure.hotfixText,
+      code: hotfixExample,
     },
   };
 
@@ -193,7 +199,7 @@ async function copyText(key, value) {
             <span>{{ t.terminal.select }}</span>
             <div role="group" :aria-label="t.terminal.select">
               <button
-                v-for="type in ['patch', 'minor', 'major']"
+                v-for="type in ['patch', 'minor', 'major', 'hotfix']"
                 :key="type"
                 type="button"
                 :class="{ active: releaseType === type }"
@@ -458,7 +464,7 @@ async function copyText(key, value) {
             <p class="eyebrow">{{ t.configure.eyebrow }}</p>
             <h2>{{ t.configure.title }}</h2>
           </div>
-          <div class="guide-tabs" role="tablist">
+          <div class="guide-tabs configure-tabs" role="tablist">
             <button
               id="config-tab"
               type="button"
@@ -491,6 +497,17 @@ async function copyText(key, value) {
               @click="activeGuide = 'features'"
             >
               {{ t.configure.featureTab }}
+            </button>
+            <button
+              id="hotfix-tab"
+              type="button"
+              role="tab"
+              :aria-selected="activeGuide === 'hotfix'"
+              aria-controls="guide-panel"
+              :class="{ active: activeGuide === 'hotfix' }"
+              @click="activeGuide = 'hotfix'"
+            >
+              {{ t.configure.hotfixTab }}
             </button>
           </div>
         </div>

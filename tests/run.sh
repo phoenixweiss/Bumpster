@@ -202,6 +202,24 @@ create_feature_fixture() {
   git -C "$fixture_worktree" push -q -u origin feature/example
 }
 
+create_hotfix_fixture() {
+  local name="$1"
+
+  create_fixture "$name" || return 1
+
+  printf 'Unreleased development change\n' \
+    > "$fixture_worktree/development.txt" || return 1
+  git -C "$fixture_worktree" add development.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add unreleased development change" ||
+    return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+
+  git -C "$fixture_worktree" checkout -q -b hotfix/urgent main || return 1
+  printf 'Urgent production fix\n' > "$fixture_worktree/hotfix.txt" || return 1
+  git -C "$fixture_worktree" add hotfix.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Fix urgent production issue"
+}
+
 enable_package_sync() {
   printf '\nSYNC_WITH_PACKAGE_JSON="true"\n' >> "$fixture_worktree/.bumpsterrc" ||
     return 1
@@ -411,6 +429,8 @@ test_cli_help_and_version_contract() {
     "-M, --major"
     "-m, --minor"
     "-p, --patch"
+    "-x, --create-hotfix"
+    "-H, --hotfix"
     "-u, --update"
     "-v, --version"
     "-s, --status"
@@ -456,6 +476,8 @@ test_cli_rejects_ambiguous_actions_without_mutation() {
     "--version --status"
     "--major --minor"
     "--patch --status"
+    "--create-hotfix --hotfix"
+    "--hotfix --patch"
   )
 
   create_fixture "cli-ambiguous-actions" || return 1
@@ -916,19 +938,19 @@ test_hooks_use_project_priority_and_version_environment() {
   {
     printf '#!/usr/bin/env bash\n'
     # shellcheck disable=SC2016
-    printf 'printf "global-pre:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" > %q\n' \
+    printf 'printf "global-pre:%%s:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" "$BUMPSTER_RELEASE_TYPE" > %q\n' \
       "$hook_log"
   } > "$global_hook_dir/pre-bump" || return 1
   {
     printf '#!/usr/bin/env bash\n'
     # shellcheck disable=SC2016
-    printf 'printf "project-pre:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" > %q\n' \
+    printf 'printf "project-pre:%%s:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" "$BUMPSTER_RELEASE_TYPE" > %q\n' \
       "$hook_log"
   } > "$project_hook_dir/pre-bump" || return 1
   {
     printf '#!/usr/bin/env bash\n'
     # shellcheck disable=SC2016
-    printf 'printf "project-post:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" >> %q\n' \
+    printf 'printf "project-post:%%s:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" "$BUMPSTER_RELEASE_TYPE" >> %q\n' \
       "$hook_log"
   } > "$project_hook_dir/post-bump" || return 1
   chmod +x \
@@ -939,9 +961,129 @@ test_hooks_use_project_priority_and_version_environment() {
   run_bumpster_with_home "$runtime_home" --patch
 
   assert_successful_release "0.8.1" || return 1
-  assert_equal $'project-pre:0.8.0:0.8.1\nproject-post:0.8.0:0.8.1' \
+  assert_equal $'project-pre:0.8.0:0.8.1:patch\nproject-post:0.8.0:0.8.1:patch' \
     "$(<"$hook_log")" \
     "Hooks did not use project priority or receive both versions"
+}
+
+test_create_hotfix_from_release_branch() {
+  create_fixture "create-hotfix" || return 1
+
+  run_bumpster_with_input "urgent-install-fix" -x
+
+  assert_equal "0" "$cli_status" \
+    "Hotfix creation failed: $cli_output" || return 1
+  assert_equal "hotfix/urgent-install-fix" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Hotfix creation did not switch to the new branch" || return 1
+  assert_equal "$(git -C "$fixture_worktree" rev-parse origin/main)" \
+    "$(git -C "$fixture_worktree" rev-parse HEAD)" \
+    "Hotfix branch was not created from current origin/main" || return 1
+  assert_equal "origin/main" \
+    "$(git -C "$fixture_worktree" rev-parse --abbrev-ref 'main@{upstream}')" \
+    "Hotfix creation did not preserve the release branch upstream" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix branch 'hotfix/urgent-install-fix' created from 'origin/main'." \
+    "Hotfix creation result is unclear"
+}
+
+test_create_hotfix_honors_custom_release_branch() {
+  create_fixture "create-hotfix-custom-release" || return 1
+  configure_custom_release_branches || return 1
+  printf '%s\n' \
+    'GIT_MASTER_BRANCH="stable"' \
+    'GIT_DEVELOP_BRANCH="integration"' \
+    > "$fixture_worktree/.bumpsterrc" || return 1
+  git -C "$fixture_worktree" add .bumpsterrc || return 1
+  git -C "$fixture_worktree" commit -q -m "Configure custom release branches" ||
+    return 1
+
+  run_bumpster_with_input "hotfix/custom-release" --create-hotfix
+
+  assert_equal "0" "$cli_status" \
+    "Custom hotfix creation failed: $cli_output" || return 1
+  assert_equal "hotfix/custom-release" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Custom hotfix creation used the wrong branch name" || return 1
+  assert_equal "$(git -C "$fixture_worktree" rev-parse origin/stable)" \
+    "$(git -C "$fixture_worktree" rev-parse HEAD)" \
+    "Hotfix branch was not created from the configured release branch"
+}
+
+test_create_hotfix_rejects_dirty_worktree() {
+  local initial_head
+
+  create_fixture "create-hotfix-dirty" || return 1
+  printf 'Uncommitted change\n' >> "$fixture_worktree/README.md" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --create-hotfix
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix creation unexpectedly accepted a dirty worktree" || return 1
+  assert_contains "$cli_output" \
+    "Working tree must be clean before creating a hotfix branch." \
+    "Dirty hotfix creation error is unclear" || return 1
+  assert_equal "dev" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Rejected hotfix creation changed the current branch" || return 1
+  assert_equal "$initial_head" \
+    "$(git -C "$fixture_worktree" rev-parse HEAD)" \
+    "Rejected hotfix creation changed HEAD"
+}
+
+test_create_hotfix_fast_forwards_release_branch() {
+  local remote_main
+
+  create_fixture "create-hotfix-fast-forward" || return 1
+  git -C "$fixture_worktree" checkout -q main || return 1
+  printf 'Published release update\n' \
+    > "$fixture_worktree/release-update.txt" || return 1
+  git -C "$fixture_worktree" add release-update.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Publish release update" || return 1
+  git -C "$fixture_worktree" push -q origin main || return 1
+  remote_main="$(git -C "$fixture_worktree" rev-parse main)" || return 1
+  git -C "$fixture_worktree" checkout -q dev || return 1
+  git -C "$fixture_worktree" branch -f main 'main^' || return 1
+
+  run_bumpster_with_input "current-release" --create-hotfix
+
+  assert_equal "0" "$cli_status" \
+    "Hotfix creation did not fast-forward main: $cli_output" || return 1
+  assert_equal "$remote_main" \
+    "$(git -C "$fixture_worktree" rev-parse main)" \
+    "Local release branch was not fast-forwarded" || return 1
+  assert_equal "$remote_main" \
+    "$(git -C "$fixture_worktree" rev-parse hotfix/current-release)" \
+    "Hotfix was not created from the fast-forwarded release branch"
+}
+
+test_create_hotfix_preserves_divergent_release_branch() {
+  local local_main
+
+  create_fixture "create-hotfix-divergent-main" || return 1
+  git -C "$fixture_worktree" checkout -q main || return 1
+  printf 'Unpublished release change\n' \
+    > "$fixture_worktree/local-main.txt" || return 1
+  git -C "$fixture_worktree" add local-main.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add unpublished release change" ||
+    return 1
+  local_main="$(git -C "$fixture_worktree" rev-parse main)" || return 1
+  git -C "$fixture_worktree" checkout -q dev || return 1
+
+  run_bumpster_with_input "must-not-start" -x
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix creation overwrote an unpublished release branch" || return 1
+  assert_contains "$cli_output" \
+    "Local release branch 'main' has unpublished or divergent commits." \
+    "Divergent release branch error is unclear" || return 1
+  assert_equal "$local_main" \
+    "$(git -C "$fixture_worktree" rev-parse main)" \
+    "Rejected hotfix creation changed the local release branch" || return 1
+  assert_equal "dev" \
+    "$(git -C "$fixture_worktree" branch --show-current)" \
+    "Rejected hotfix creation changed the current branch"
 }
 
 test_clean_feature_branch_is_closed() {
@@ -1369,6 +1511,201 @@ test_major_release_flow() {
   create_fixture "major-release" "1.2.3" || return 1
   run_bumpster --major
   assert_successful_release "2.0.0"
+}
+
+test_hotfix_release_flow() {
+  local hook_dir
+  local hook_log
+  local remote_tag_commit
+
+  create_hotfix_fixture "hotfix-release" || return 1
+  hook_dir="$fixture_worktree/.bumpster/hooks"
+  hook_log="$fixture_root/hotfix-hooks.log"
+  mkdir -p "$hook_dir" || return 1
+  printf '/.bumpster/\n' >> "$fixture_worktree/.git/info/exclude" || return 1
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016
+    printf 'printf "pre:%%s:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" "$BUMPSTER_RELEASE_TYPE" > %q\n' \
+      "$hook_log"
+  } > "$hook_dir/pre-bump" || return 1
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016
+    printf 'printf "post:%%s:%%s:%%s\\n" "$BUMPSTER_PREV_VERSION" "$BUMPSTER_NEW_VERSION" "$BUMPSTER_RELEASE_TYPE" >> %q\n' \
+      "$hook_log"
+  } > "$hook_dir/post-bump" || return 1
+  chmod +x "$hook_dir/pre-bump" "$hook_dir/post-bump" || return 1
+
+  run_bumpster --hotfix
+
+  assert_successful_release "0.8.1" || return 1
+  assert_contains "$cli_output" "Release plan: 0.8.0 -> 0.8.1 (hotfix)." \
+    "Hotfix release plan is missing" || return 1
+  assert_contains "$cli_output" "Running hotfix branch checks." \
+    "Hotfix-specific preflight is missing" || return 1
+  assert_contains "$cli_output" \
+    "Merging hotfix 'hotfix/urgent' into 'dev'." \
+    "Hotfix was not merged into development" || return 1
+  assert_contains "$cli_output" \
+    "Fast-forwarding 'main' to hotfix 'hotfix/urgent'." \
+    "Release branch was not fast-forwarded to the hotfix" || return 1
+
+  assert_command_succeeds "Hotfix is missing from remote main" \
+    git --git-dir="$fixture_origin" cat-file -e refs/heads/main:hotfix.txt ||
+    return 1
+  assert_command_succeeds "Hotfix is missing from remote development" \
+    git --git-dir="$fixture_origin" cat-file -e refs/heads/dev:hotfix.txt ||
+    return 1
+  if git --git-dir="$fixture_origin" cat-file -e \
+    refs/heads/main:development.txt 2>/dev/null; then
+    fail "Hotfix published unreleased development content to main" || return 1
+  fi
+  assert_command_succeeds "Unreleased development content disappeared" \
+    git --git-dir="$fixture_origin" cat-file -e refs/heads/dev:development.txt ||
+    return 1
+
+  remote_tag_commit="$(
+    git --git-dir="$fixture_origin" rev-list -n 1 refs/tags/v0.8.1
+  )" || return 1
+  assert_equal "$(git --git-dir="$fixture_origin" rev-parse refs/heads/main)" \
+    "$remote_tag_commit" "Hotfix tag does not point to remote main" || return 1
+  assert_command_succeeds "Remote main is not contained in remote development" \
+    git --git-dir="$fixture_origin" merge-base --is-ancestor \
+      refs/heads/main refs/heads/dev || return 1
+  assert_equal $'pre:0.8.0:0.8.1:hotfix\npost:0.8.0:0.8.1:hotfix' \
+    "$(<"$hook_log")" "Hotfix hooks did not receive the release type"
+}
+
+test_hotfix_requires_dedicated_branch() {
+  local initial_head
+
+  create_fixture "hotfix-from-development" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster --hotfix
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix unexpectedly started from development" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix releases must be run from a 'hotfix/*' branch based on 'main'." \
+    "Dedicated hotfix branch error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_hotfix_requires_explicit_option() {
+  local initial_head
+
+  create_fixture "interactive-hotfix" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster_with_input "hotfix"
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Interactive flow unexpectedly selected a hotfix" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix releases must be selected explicitly with '-H' or '--hotfix'." \
+    "Explicit hotfix option error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_hotfix_rejects_unpublished_development_history() {
+  local initial_head
+
+  create_fixture "hotfix-from-unpublished-development" || return 1
+  printf 'Unreleased development change\n' \
+    > "$fixture_worktree/development.txt" || return 1
+  git -C "$fixture_worktree" add development.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add unreleased development change" ||
+    return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+  git -C "$fixture_worktree" checkout -q -b hotfix/wrong-base || return 1
+  printf 'Urgent fix\n' > "$fixture_worktree/hotfix.txt" || return 1
+  git -C "$fixture_worktree" add hotfix.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add urgent fix" || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster -H
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix unexpectedly included development history" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix branch 'hotfix/wrong-base' contains unpublished 'dev' history." \
+    "Unpublished development history error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_hotfix_rejects_local_development_ahead() {
+  local initial_head
+
+  create_hotfix_fixture "hotfix-local-development-ahead" || return 1
+  git -C "$fixture_worktree" checkout -q dev || return 1
+  printf 'Local development change\n' \
+    > "$fixture_worktree/local-development.txt" || return 1
+  git -C "$fixture_worktree" add local-development.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add local development change" ||
+    return 1
+  git -C "$fixture_worktree" checkout -q hotfix/urgent || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster -H
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix unexpectedly pushed local development commits" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix releases require local 'dev' to match 'origin/dev' exactly." \
+    "Local development-ahead error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_hotfix_rejects_stale_release_base() {
+  local initial_head
+
+  create_hotfix_fixture "hotfix-stale-release-base" || return 1
+  git -C "$fixture_worktree" checkout -q main || return 1
+  printf 'Published release change\n' \
+    > "$fixture_worktree/release-change.txt" || return 1
+  git -C "$fixture_worktree" add release-change.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add published release change" ||
+    return 1
+  git -C "$fixture_worktree" push -q origin main || return 1
+  git -C "$fixture_worktree" checkout -q dev || return 1
+  git -C "$fixture_worktree" merge -q --no-edit main || return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+  git -C "$fixture_worktree" checkout -q hotfix/urgent || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster -H
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix unexpectedly started from a stale release base" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix branch 'hotfix/urgent' must contain the current 'main' commit." \
+    "Stale hotfix base error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
+}
+
+test_hotfix_requires_consistent_versions() {
+  local initial_head
+
+  create_hotfix_fixture "hotfix-version-mismatch" || return 1
+  git -C "$fixture_worktree" checkout -q dev || return 1
+  printf '0.9.0' > "$fixture_worktree/VERSION" || return 1
+  git -C "$fixture_worktree" add VERSION || return 1
+  git -C "$fixture_worktree" commit -q -m "Prepare development version" ||
+    return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+  git -C "$fixture_worktree" checkout -q hotfix/urgent || return 1
+  initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+
+  run_bumpster -H
+
+  [[ "$cli_status" -ne 0 ]] ||
+    fail "Hotfix unexpectedly accepted mismatched versions" || return 1
+  assert_contains "$cli_output" \
+    "Hotfix branch VERSION must match 'dev'." \
+    "Hotfix version mismatch error is unclear" || return 1
+  assert_release_state_unchanged "$initial_head" "0.8.0"
 }
 
 test_dirty_worktree_is_rejected() {
@@ -1832,6 +2169,11 @@ main() {
   run_test "missing after-bump branch falls back to configured development" test_missing_after_branch_falls_back_to_configured_development
   run_test "custom release defaults follow configured development" test_custom_release_defaults_to_configured_development
   run_test "hooks use project priority and receive both versions" test_hooks_use_project_priority_and_version_environment
+  run_test "hotfix creation starts from the current release branch" test_create_hotfix_from_release_branch
+  run_test "hotfix creation honors a custom release branch" test_create_hotfix_honors_custom_release_branch
+  run_test "hotfix creation rejects a dirty worktree" test_create_hotfix_rejects_dirty_worktree
+  run_test "hotfix creation fast-forwards a stale release branch" test_create_hotfix_fast_forwards_release_branch
+  run_test "hotfix creation preserves a divergent release branch" test_create_hotfix_preserves_divergent_release_branch
   run_test "feature creation reports an unresolved HEAD" test_create_feature_reports_unresolved_head
   run_test "clean feature branch closes and pushes committed changes" test_clean_feature_branch_is_closed
   run_test "dirty feature close cannot continue without a stash" test_dirty_feature_decline_is_rejected_without_mutation
@@ -1850,6 +2192,13 @@ main() {
   run_test "patch release updates and pushes dev, main and tag" test_patch_release_flow
   run_test "minor release resets patch and publishes the release" test_minor_release_flow
   run_test "major release resets minor and patch and publishes the release" test_major_release_flow
+  run_test "hotfix release patches main without publishing unfinished development" test_hotfix_release_flow
+  run_test "hotfix release requires a dedicated branch" test_hotfix_requires_dedicated_branch
+  run_test "hotfix release requires an explicit action option" test_hotfix_requires_explicit_option
+  run_test "hotfix release rejects unpublished development history" test_hotfix_rejects_unpublished_development_history
+  run_test "hotfix release rejects local development ahead of origin" test_hotfix_rejects_local_development_ahead
+  run_test "hotfix release rejects a stale release base" test_hotfix_rejects_stale_release_base
+  run_test "hotfix release requires consistent branch versions" test_hotfix_requires_consistent_versions
   run_test "dirty worktree is rejected without release mutations" test_dirty_worktree_is_rejected
   run_test "wrong starting branch is rejected without release mutations" test_wrong_starting_branch_is_rejected
   run_test "configured release branch cannot start a release" test_configured_release_branch_cannot_start_release

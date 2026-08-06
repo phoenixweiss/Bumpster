@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-06
+
+### Added
+
+- `bumpster --create-hotfix` and `bump -x` fetch the current release branch,
+  create a local `hotfix/*` branch from it, and switch to the new branch.
+- `bumpster --hotfix` and `bump -H` publish an urgent patch from a dedicated
+  `hotfix/*` branch based on the current release branch. The hotfix is merged
+  back into development without publishing unfinished development work to the
+  release branch.
+- Release hooks now receive `BUMPSTER_RELEASE_TYPE` with `major`, `minor`,
+  `patch`, or `hotfix` alongside the previous and next versions.
+
+### Changed
+
+- Hotfix creation requires a clean worktree and refuses to overwrite a local
+  release branch with unpublished or divergent commits.
+- Hotfix preflight requires local `main` and `dev` to match their remote refs,
+  rejects hotfix branches containing unpublished development history, and
+  keeps the existing atomic publication and recovery guarantees.
+
 ## [1.1.1] - 2026-08-04
 
 ### Fixed
@@ -328,7 +349,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/phoenixweiss/Bumpster/compare/v1.0.1...v1.0.2

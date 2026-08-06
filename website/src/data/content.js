@@ -109,6 +109,12 @@ export const content = {
         ["-M", "--major", "Publish a major release"],
         ["-m", "--minor", "Publish a minor release"],
         ["-p", "--patch", "Publish a patch release"],
+        [
+          "-x",
+          "--create-hotfix",
+          "Create a hotfix branch from the release branch",
+        ],
+        ["-H", "--hotfix", "Publish an urgent patch from a hotfix branch"],
         ["-s", "--status", "Read repository status"],
         ["-f", "--create-feature", "Start a feature branch"],
         ["-c", "--close-feature", "Merge and close a feature"],
@@ -123,15 +129,19 @@ export const content = {
       configTab: "Configuration",
       hooksTab: "Hooks",
       featureTab: "Branches",
+      hotfixTab: "Hotfix",
       configTitle: "Project or global settings",
       configText:
         "Keep settings in `./.bumpsterrc` or `~/.bumpsterrc`. Project settings take priority.",
       hooksTitle: "Two clear extension points",
       hooksText:
-        "Executable `pre-bump` and `post-bump` hooks receive the previous and next version as environment variables.",
+        "Executable `pre-bump` and `post-bump` hooks receive the previous version, next version, and release type as environment variables.",
       featureTitle: "Feature branches without git-flow",
       featureText:
         "Create a feature from the configured development branch, then merge, push, and optionally remove it through explicit commands.",
+      hotfixTitle: "Create and publish a hotfix",
+      hotfixText:
+        "Run `bump -x` to create `hotfix/*` from the current release branch. Make and commit the fix, then publish the patch with `bump -H`.",
     },
     footprint: {
       eyebrow: "EASY TO REMOVE",
@@ -276,6 +286,8 @@ export const content = {
         ["-M", "--major", "Опубликовать major-релиз"],
         ["-m", "--minor", "Опубликовать minor-релиз"],
         ["-p", "--patch", "Опубликовать patch-релиз"],
+        ["-x", "--create-hotfix", "Создать hotfix-ветку от release-ветки"],
+        ["-H", "--hotfix", "Выпустить срочный patch из hotfix-ветки"],
         ["-s", "--status", "Показать состояние репозитория"],
         ["-f", "--create-feature", "Начать feature-ветку"],
         ["-c", "--close-feature", "Влить и закрыть feature-ветку"],
@@ -290,15 +302,19 @@ export const content = {
       configTab: "Конфигурация",
       hooksTab: "Хуки",
       featureTab: "Ветки",
+      hotfixTab: "Хотфикс",
       configTitle: "Настройки проекта или пользователя",
       configText:
         "Храните настройки в `./.bumpsterrc` или `~/.bumpsterrc`. Настройки проекта имеют приоритет.",
       hooksTitle: "Две понятные точки расширения",
       hooksText:
-        "Исполняемые хуки `pre-bump` и `post-bump` получают предыдущую и новую версии через переменные окружения.",
+        "Исполняемые хуки `pre-bump` и `post-bump` получают предыдущую и новую версии, а также тип релиза через переменные окружения.",
       featureTitle: "Feature-ветки без git-flow",
       featureText:
         "Создайте feature-ветку от настроенной ветки разработки, затем влейте, отправьте и при необходимости удалите её явными командами.",
+      hotfixTitle: "Создайте и выпустите хотфикс",
+      hotfixText:
+        "Запустите `bump -x`, чтобы создать `hotfix/*` от актуальной release-ветки. Внесите и закоммитьте исправление, затем выпустите patch через `bump -H`.",
     },
     footprint: {
       eyebrow: "ЛЕГКО УДАЛИТЬ",

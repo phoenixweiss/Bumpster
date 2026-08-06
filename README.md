@@ -20,6 +20,8 @@
 ## Key Features
 
 - Supports automatic version bumping for **major**, **minor**, and **patch** updates.
+- Publishes urgent patch releases from isolated `hotfix/*` branches without
+  shipping unfinished development work.
 - Works seamlessly with Git for release management without requiring `git-flow`.
 - Configurable branch names for `master` and `develop`.
 - Feature branch creation and closing with customizable behavior.
@@ -141,7 +143,8 @@ guarantees are defined in the
 
 ### Release Pre-flight Checks
 
-Before running `--major`, `--minor`, `--patch`, or the interactive release flow:
+Before running `--major`, `--minor`, `--patch`, or the interactive release
+flow:
 
 - Ensure you are inside an initialized Git repository (`git rev-parse --git-dir` should print the `.git` path and exit without errors).
 - Ensure `VERSION` exists and contains a stable semantic version in the exact
@@ -197,6 +200,51 @@ bumpster --patch
 # or
 bump -p
 ```
+
+### Hotfix Releases
+
+Use a hotfix release for an urgent production fix that must not include work
+waiting on the development branch. Start by asking Bumpster to create a branch
+from the current release branch:
+
+```bash
+bumpster --create-hotfix
+# or
+bump -x
+```
+
+Enter a short name such as `urgent-fix`; Bumpster creates and checks out
+`hotfix/urgent-fix`. Make the fix, test it, and commit every changed file:
+
+```bash
+git add .
+git commit -m "Fix urgent issue"
+```
+
+With a clean worktree on the new branch, publish the hotfix:
+
+```bash
+bumpster --hotfix
+# or
+bump -H
+```
+
+The creation command fetches `origin`, safely fast-forwards the configured local
+release branch, and creates `hotfix/*` from it. It requires a clean worktree and
+refuses a local release branch with unpublished or divergent commits.
+
+A hotfix always increments the patch component. Before changing release files,
+Bumpster requires the active `hotfix/*` branch to contain the current release
+branch without unpublished development history. Local release and development
+branches must match their `origin` branches exactly, and all three branches
+must start from the same `VERSION`.
+
+After the version commit, Bumpster merges the hotfix into `dev`, fast-forwards
+`main` only to the hotfix, tags that `main` commit, and publishes `dev`, `main`,
+and the tag atomically. The hotfix branch itself is retained for manual cleanup.
+`BEFORE_BUMP_BRANCH` does not select the hotfix branch; the active `hotfix/*`
+branch does. `AFTER_BUMP_BRANCH` still controls the final checkout and defaults
+to `dev`.
 
 ### Synchronizing with package.json
 
@@ -395,8 +443,9 @@ hook names are supported:
   files are updated or committed.
 - `post-bump` - runs after the atomic push and the final branch checkout.
 
-Hooks receive the environment variables `BUMPSTER_PREV_VERSION` and
-`BUMPSTER_NEW_VERSION` so they can inspect both versions. A non-zero
+Hooks receive `BUMPSTER_PREV_VERSION`, `BUMPSTER_NEW_VERSION`, and
+`BUMPSTER_RELEASE_TYPE`. The type is `major`, `minor`, `patch`, or `hotfix`.
+A non-zero
 `pre-bump` status aborts before the first release mutation. A non-zero
 `post-bump` status makes the command fail, but the already published branches
 and tag are not rolled back.
