@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- The Release Counter visual identity in Flat and Terminal forms, with outlined
+  SVG masters, raster exports, a documented palette, and usage guidance.
+- Branded favicon, touch, manifest, and social-preview assets for the website.
+
+### Changed
+
+- The English and Russian READMEs and website now use the Release Counter
+  lockup and the shared burgundy, paper, and ink palette.
+- CLI help now reproduces the identity as a compact three-line, 27-column
+  printable ASCII counter.
+
 ## [1.2.0] - 2026-08-06
 
 ### Added

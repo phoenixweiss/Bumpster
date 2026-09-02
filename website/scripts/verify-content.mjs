@@ -177,24 +177,31 @@ assert(
   "Terminal logo must contain only printable 7-bit ASCII.",
 );
 
-for (const path of [
-  "docs/brand/bumpster-favicon.png",
-  "docs/brand/bumpster-favicon-sheet.png",
-  "docs/brand/bumpster-flat-terminal-sheet.png",
-  "docs/brand/bumpster-lockup.png",
-  "docs/brand/bumpster-mark.png",
-  "docs/brand/bumpster-social-card.png",
-  "website/public/apple-touch-icon.png",
-  "website/public/favicon-16.png",
-  "website/public/favicon-32.png",
-  "website/public/icon-192.png",
-  "website/public/icon-512.png",
-  "website/public/og-image.png",
-]) {
+const brandRasterDimensions = new Map([
+  ["docs/brand/bumpster-favicon.png", [512, 512]],
+  ["docs/brand/bumpster-favicon-sheet.png", [1600, 1000]],
+  ["docs/brand/bumpster-flat-terminal-sheet.png", [1800, 1200]],
+  ["docs/brand/bumpster-lockup.png", [1960, 280]],
+  ["docs/brand/bumpster-mark.png", [1200, 560]],
+  ["docs/brand/bumpster-social-card.png", [1200, 630]],
+  ["website/public/apple-touch-icon.png", [180, 180]],
+  ["website/public/favicon-16.png", [16, 16]],
+  ["website/public/favicon-32.png", [32, 32]],
+  ["website/public/icon-192.png", [192, 192]],
+  ["website/public/icon-512.png", [512, 512]],
+  ["website/public/og-image.png", [1200, 630]],
+]);
+
+for (const [path, [expectedWidth, expectedHeight]] of brandRasterDimensions) {
   const image = await readFile(join(repositoryRoot, path));
   assert(
     image.length > 8 && image.subarray(1, 4).toString("ascii") === "PNG",
     `Brand raster is missing or is not a PNG: ${path}`,
+  );
+  assert(
+    image.readUInt32BE(16) === expectedWidth &&
+      image.readUInt32BE(20) === expectedHeight,
+    `Brand raster has unexpected dimensions: ${path}`,
   );
 }
 

@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "website/**"
+      - "docs/brand/**"
+      - "README.md"
+      - "README_RU.md"
+      - "lib/BUMPSTER_LOGO.ASCII"
       - ".github/dependabot.yml"
       - ".github/workflows/site-ci.yml"
       - ".github/workflows/pages.yml"
@@ -13,6 +17,10 @@ on:
       - main
     paths:
       - "website/**"
+      - "docs/brand/**"
+      - "README.md"
+      - "README_RU.md"
+      - "lib/BUMPSTER_LOGO.ASCII"
       - ".github/dependabot.yml"
       - ".github/workflows/site-ci.yml"
       - ".github/workflows/pages.yml"
