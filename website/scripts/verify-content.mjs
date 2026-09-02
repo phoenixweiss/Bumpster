@@ -87,6 +87,14 @@ const [
   readme,
   readmeRu,
   runtimeBuilder,
+  brandLockup,
+  websiteLockup,
+  brandFavicon,
+  websiteFavicon,
+  englishIndex,
+  russianIndex,
+  manifestSource,
+  terminalLogo,
 ] = await Promise.all([
   readCliHelp(),
   readRepositoryFile("lib/functions.sh"),
@@ -95,7 +103,100 @@ const [
   readRepositoryFile("README.md"),
   readRepositoryFile("README_RU.md"),
   readRepositoryFile("scripts/build-runtime.sh"),
+  readRepositoryFile("docs/brand/bumpster-lockup.svg"),
+  readRepositoryFile("website/src/assets/bumpster-lockup.svg"),
+  readRepositoryFile("docs/brand/bumpster-favicon.svg"),
+  readRepositoryFile("website/public/favicon.svg"),
+  readRepositoryFile("website/index.html"),
+  readRepositoryFile("website/ru/index.html"),
+  readRepositoryFile("website/public/site.webmanifest"),
+  readRepositoryFile("lib/BUMPSTER_LOGO.ASCII"),
 ]);
+
+assert(
+  brandLockup === websiteLockup,
+  "Website lockup differs from the canonical brand asset.",
+);
+assert(
+  brandFavicon === websiteFavicon,
+  "Website favicon differs from the canonical brand asset.",
+);
+
+for (const documentation of [readme, readmeRu]) {
+  assertIncludes(
+    documentation,
+    'src="docs/brand/bumpster-lockup.svg"',
+    "README is missing the canonical Bumpster lockup",
+  );
+}
+
+const sharedWebsiteBrandReferences = [
+  "/Bumpster/favicon.svg",
+  "/Bumpster/favicon-32.png",
+  "/Bumpster/favicon-16.png",
+  "/Bumpster/apple-touch-icon.png",
+  "https://phoenixweiss.github.io/Bumpster/og-image.png",
+  'content="1200"',
+  'content="630"',
+  'content="summary_large_image"',
+];
+
+for (const indexSource of [englishIndex, russianIndex]) {
+  for (const reference of sharedWebsiteBrandReferences) {
+    assertIncludes(
+      indexSource,
+      reference,
+      "Website metadata is missing a brand asset reference",
+    );
+  }
+}
+
+const manifest = JSON.parse(manifestSource);
+assert(
+  manifest.background_color === "#f3f0ea" && manifest.theme_color === "#941e3d",
+  "Web manifest colors differ from the approved brand palette.",
+);
+assertSameSet(
+  new Set(manifest.icons.map(({ src }) => src)),
+  new Set([
+    "/Bumpster/favicon.svg",
+    "/Bumpster/icon-192.png",
+    "/Bumpster/icon-512.png",
+  ]),
+  "Web manifest icon list differs from the branded icon set.",
+);
+
+const terminalLogoLines = terminalLogo.trimEnd().split("\n");
+assert(
+  terminalLogoLines.length === 3 &&
+    Math.max(...terminalLogoLines.map((line) => line.length)) === 27,
+  "Terminal logo must remain within its 27-column, three-line contract.",
+);
+assert(
+  /^[\x20-\x7e\n]+$/.test(terminalLogo),
+  "Terminal logo must contain only printable 7-bit ASCII.",
+);
+
+for (const path of [
+  "docs/brand/bumpster-favicon.png",
+  "docs/brand/bumpster-favicon-sheet.png",
+  "docs/brand/bumpster-flat-terminal-sheet.png",
+  "docs/brand/bumpster-lockup.png",
+  "docs/brand/bumpster-mark.png",
+  "docs/brand/bumpster-social-card.png",
+  "website/public/apple-touch-icon.png",
+  "website/public/favicon-16.png",
+  "website/public/favicon-32.png",
+  "website/public/icon-192.png",
+  "website/public/icon-512.png",
+  "website/public/og-image.png",
+]) {
+  const image = await readFile(join(repositoryRoot, path));
+  assert(
+    image.length > 8 && image.subarray(1, 4).toString("ascii") === "PNG",
+    `Brand raster is missing or is not a PNG: ${path}`,
+  );
+}
 
 const englishCommands = content.en.commands.items.map(([short, long]) => [
   short,

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 
+import brandLockupUrl from "@/assets/bumpster-lockup.svg";
 import { content } from "@/data/content";
 import {
   bumpOptions,
@@ -131,9 +132,12 @@ async function copyText(key, value) {
   <header class="site-header">
     <div class="shell header-inner">
       <a class="brand" :href="baseUrl" aria-label="Bumpster home">
-        <span class="brand-mark" aria-hidden="true">B</span>
-        <span>BUMPSTER</span>
-        <span class="brand-cursor" aria-hidden="true"></span>
+        <img
+          class="brand-lockup"
+          :src="brandLockupUrl"
+          alt=""
+          aria-hidden="true"
+        />
       </a>
 
       <nav
@@ -622,10 +626,8 @@ async function copyText(key, value) {
     <section class="closing-section">
       <div class="closing-grid" aria-hidden="true"></div>
       <div class="shell closing-inner">
-        <div class="closing-brand" aria-label="Bumpster">
-          <span class="brand-mark" aria-hidden="true">B</span>
-          <span>BUMPSTER</span>
-          <span class="brand-cursor" aria-hidden="true"></span>
+        <div class="closing-brand">
+          <img class="brand-lockup" :src="brandLockupUrl" alt="Bumpster" />
         </div>
         <p class="eyebrow">{{ t.closing.eyebrow }}</p>
         <h2>{{ t.closing.title }}</h2>

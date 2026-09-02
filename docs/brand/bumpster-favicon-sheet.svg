@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-labelledby="title description">
+  <title id="title">Bumpster favicon size sheet</title>
+  <desc id="description">The compact Bumpster favicon shown at large scale and at browser-relevant sizes.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#171717" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#dedbd5"/>
+  <text x="70" y="72" fill="#706a64" font-family="system-ui, sans-serif" font-size="22" font-weight="600" letter-spacing="3">OPTICAL FLAT CROP</text>
+  <image href="bumpster-favicon.svg" x="70" y="120" width="690" height="690" filter="url(#shadow)"/>
+
+  <text x="890" y="72" fill="#706a64" font-family="system-ui, sans-serif" font-size="22" font-weight="600" letter-spacing="3">SIZE CHECK</text>
+  <g fill="#706a64" font-family="system-ui, sans-serif" font-size="18">
+    <image href="bumpster-favicon.svg" x="890" y="150" width="256" height="256"/>
+    <text x="1018" y="442" text-anchor="middle">256 px</text>
+    <image href="bumpster-favicon.svg" x="1230" y="214" width="128" height="128"/>
+    <text x="1294" y="442" text-anchor="middle">128 px</text>
+    <image href="bumpster-favicon.svg" x="922" y="550" width="64" height="64"/>
+    <text x="954" y="650" text-anchor="middle">64 px</text>
+    <image href="bumpster-favicon.svg" x="1110" y="566" width="32" height="32"/>
+    <text x="1126" y="650" text-anchor="middle">32 px</text>
+    <image href="bumpster-favicon.svg" x="1286" y="574" width="16" height="16"/>
+    <text x="1294" y="650" text-anchor="middle">16 px</text>
+  </g>
+
+  <text x="70" y="900" fill="#171717" font-family="system-ui, sans-serif" font-size="30" font-weight="700">Bumpster</text>
+  <text x="70" y="944" fill="#706a64" font-family="system-ui, sans-serif" font-size="20">The bumped z-cell remains recognizable when the full counter no longer fits.</text>
+</svg>

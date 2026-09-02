@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 140" role="img" aria-labelledby="title description" style="color:#941e3d">
+  <title id="title">Bumpster version counter mark</title>
+  <desc id="description">Three semantic-version cells separated by dots, with a caret bump above the patch cell.</desc>
+  <metadata>
+    Primary flat mark for Bumpster.
+    Geometry: three 72 by 92 cells on a 109-unit rhythm.
+    The caret is structural and remains visible in single-ink applications.
+    Change the root color property to recolor the complete mark.
+  </metadata>
+
+  <g fill="none" stroke="currentColor" stroke-width="10" stroke-linejoin="miter">
+    <rect x="5" y="35" width="72" height="92"/>
+    <rect x="114" y="35" width="72" height="92"/>
+    <path d="M223 35H244L259 18L274 35H295V127H223Z"/>
+  </g>
+
+  <circle cx="96" cy="82" r="6" fill="currentColor"/>
+  <circle cx="205" cy="82" r="6" fill="currentColor"/>
+
+  <g fill="currentColor">
+    <path transform="translate(18 96) scale(0.075 -0.075)" d="M59 0 186 245V263L65 496H205L297 314H315L407 496H546L426 263V245L553 0H408L315 194H297L204 0Z"/>
+    <path transform="translate(127 96) scale(0.075 -0.075)" d="M168 -200V-80H387Q414 -80 414 -50V72H396Q363 -14 254 -14Q205 -14 165 7.5Q125 29 101.5 73.5Q78 118 78 186V496H204V212Q204 160 229.5 130Q255 100 304 100Q361 100 387.5 136.5Q414 173 414 236V496H540V-122Q540 -156 518.5 -178Q497 -200 463 -200Z"/>
+    <path transform="translate(236 96) scale(0.075 -0.075)" d="M91 0V210L403 362V380H97V496H511V292L199 138V120H523V0Z"/>
+  </g>
+</svg>

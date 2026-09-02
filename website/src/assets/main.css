@@ -5,18 +5,18 @@
   font-family: "Nunito Sans Variable", "Nunito Sans", ui-sans-serif, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --color-base-100: oklch(95.814% 0 0);
-  --color-base-200: oklch(89.107% 0 0);
-  --color-base-300: oklch(82.4% 0 0);
-  --color-base-content: oklch(19.162% 0 0);
-  --color-primary: oklch(40.723% 0.161 17.53);
-  --color-primary-content: oklch(88.144% 0.032 17.53);
-  --color-secondary: oklch(61.676% 0.169 23.865);
-  --color-secondary-content: oklch(12.335% 0.033 23.865);
-  --color-accent: oklch(73.425% 0.094 60.729);
-  --color-accent-content: oklch(14.685% 0.018 60.729);
-  --color-neutral: oklch(54.367% 0.037 51.902);
-  --color-neutral-content: oklch(90.873% 0.007 51.902);
+  --color-base-100: #f3f0ea;
+  --color-base-200: #e4e0da;
+  --color-base-300: #d4cdc4;
+  --color-base-content: #171717;
+  --color-primary: #941e3d;
+  --color-primary-content: #f8f3eb;
+  --color-secondary: #d85a78;
+  --color-secondary-content: #1f0b11;
+  --color-accent: #e7a06c;
+  --color-accent-content: #21150d;
+  --color-neutral: #706a64;
+  --color-neutral-content: #f6f1e9;
   --color-info: oklch(69.224% 0.097 207.284);
   --color-info-content: oklch(13.844% 0.019 207.284);
   --color-success: oklch(60.995% 0.08 174.616);
@@ -119,34 +119,15 @@ a {
 
 .brand {
   display: inline-flex;
-  gap: 10px;
   align-items: center;
   color: var(--ink);
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
   text-decoration: none;
 }
 
-.brand-mark {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  place-items: center;
-  border: 1px solid var(--ink);
-  color: var(--color-neutral-content);
-  background: var(--ink);
-  font-size: 15px;
-  letter-spacing: 0;
-}
-
-.brand-cursor {
-  width: 7px;
-  height: 15px;
-  margin-left: -6px;
-  background: var(--blue);
-  animation: blink 1.2s steps(1) infinite;
+.brand-lockup {
+  display: block;
+  width: 176px;
+  height: auto;
 }
 
 .primary-nav {
@@ -1084,18 +1065,14 @@ a {
 
 .closing-brand {
   display: inline-flex;
-  gap: 10px;
   align-items: center;
   margin-bottom: 28px;
   color: var(--color-primary-content);
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
 }
 
-.closing-brand .brand-cursor {
-  background: var(--color-accent);
+.closing-brand .brand-lockup {
+  width: 236px;
+  filter: brightness(0) invert(1);
 }
 
 .closing-inner .eyebrow {
@@ -1180,17 +1157,6 @@ a {
   font-style: normal;
 }
 
-@keyframes blink {
-  0%,
-  48% {
-    opacity: 1;
-  }
-  49%,
-  100% {
-    opacity: 0;
-  }
-}
-
 @media (max-width: 980px) {
   .primary-nav {
     display: none;
@@ -1249,13 +1215,11 @@ a {
   }
 
   .brand {
-    gap: 8px;
-    font-size: 13px;
+    max-width: 148px;
   }
 
-  .brand-mark {
-    width: 28px;
-    height: 28px;
+  .brand-lockup {
+    width: 148px;
   }
 
   .header-actions {
@@ -1382,6 +1346,15 @@ a {
     min-height: 42px;
     border-top: 1px solid var(--line-dark);
     border-left: 0;
+  }
+
+  .install-note p {
+    min-width: 0;
+  }
+
+  .install-note .inline-code {
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .commands-layout {

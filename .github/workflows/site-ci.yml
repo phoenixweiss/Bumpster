@@ -83,7 +83,13 @@ jobs:
           for required_file in \
             dist/index.html \
             dist/ru/index.html \
+            dist/apple-touch-icon.png \
+            dist/favicon-16.png \
+            dist/favicon-32.png \
             dist/favicon.svg \
+            dist/icon-192.png \
+            dist/icon-512.png \
+            dist/og-image.png \
             dist/robots.txt \
             dist/site.webmanifest \
             dist/sitemap.xml

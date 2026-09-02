@@ -1,16 +1,9 @@
 # Bumpster
 
+<p align="center"><img src="docs/brand/bumpster-lockup.svg" alt="Bumpster" width="560"></p>
+
 [![CI](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/phoenixweiss/Bumpster?display_name=tag&sort=semver)](https://github.com/phoenixweiss/Bumpster/releases/latest)
-
-```ascii
-    _____                                 __
-   / _  / __  __ ____ ___   ____   _____ / /_ ___   _____
-  / __  |/ / / // __ `__ \ / __ \ / ___// __// _ \ / ___/
- / /_/ // /_/ // / / / / // /_/ /(__  )/ /_ / ___// /
-/_____/ \__,_//_/ /_/ /_// .___//____/ \__/ \___//_/
-                        /_/
-```
 
 [САЙТ](https://phoenixweiss.github.io/Bumpster/ru/) ·
 [ENGLISH VERSION](README.md)
