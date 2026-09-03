@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
   <title id="title">Bumpster web app icon</title>
-  <desc id="description">The bumped patch cell centered within a mask-safe Bumpster brand-color square.</desc>
+  <desc id="description">The bumped uppercase Z patch cell centered within a mask-safe Bumpster brand-color square.</desc>
   <metadata>
     Full-bleed source for web-manifest and Apple touch icons.
     Important geometry stays within the central mask-safe area.

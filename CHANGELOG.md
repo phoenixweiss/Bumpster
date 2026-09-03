@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The Flat and Terminal release counters now use uppercase `X.Y.Z` symbols
+  consistently across the brand masters, website assets, and CLI help.
+- The Flat wordmark now uses outlined IBM Plex Mono Bold glyphs, and its website
+  lockups are larger in the header, closing section, and mobile layout.
+- CLI help now separates the Terminal logo from surrounding output with blank
+  lines and highlights both the patch caret and `Z` in interactive color output.
+
 ## [1.2.1] - 2026-09-03
 
 ### Added

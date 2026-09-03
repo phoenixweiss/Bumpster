@@ -126,7 +126,7 @@ a {
 
 .brand-lockup {
   display: block;
-  width: 176px;
+  width: 208px;
   height: auto;
 }
 
@@ -1071,7 +1071,7 @@ a {
 }
 
 .closing-brand .brand-lockup {
-  width: 236px;
+  width: 284px;
   filter: brightness(0) invert(1);
 }
 
@@ -1215,11 +1215,11 @@ a {
   }
 
   .brand {
-    max-width: 148px;
+    max-width: 168px;
   }
 
   .brand-lockup {
-    width: 148px;
+    width: 168px;
   }
 
   .header-actions {

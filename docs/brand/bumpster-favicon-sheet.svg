@@ -27,5 +27,5 @@
   </g>
 
   <text x="70" y="900" fill="#171717" font-family="system-ui, sans-serif" font-size="30" font-weight="700">Bumpster</text>
-  <text x="70" y="944" fill="#706a64" font-family="system-ui, sans-serif" font-size="20">The bumped z-cell remains recognizable when the full counter no longer fits.</text>
+  <text x="70" y="944" fill="#706a64" font-family="system-ui, sans-serif" font-size="20">The bumped Z-cell remains recognizable when the full counter no longer fits.</text>
 </svg>

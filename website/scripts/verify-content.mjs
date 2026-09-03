@@ -176,12 +176,17 @@ assert(
   /^[\x20-\x7e\n]+$/.test(terminalLogo),
   "Terminal logo must contain only printable 7-bit ASCII.",
 );
+assertIncludes(
+  terminalLogo,
+  "| X |.| Y |.| Z |  BUMPSTER",
+  "Terminal logo must use uppercase semantic-version symbols",
+);
 
 const brandRasterDimensions = new Map([
   ["docs/brand/bumpster-favicon.png", [512, 512]],
   ["docs/brand/bumpster-favicon-sheet.png", [1600, 1000]],
   ["docs/brand/bumpster-flat-terminal-sheet.png", [1800, 1200]],
-  ["docs/brand/bumpster-lockup.png", [1960, 280]],
+  ["docs/brand/bumpster-lockup.png", [1480, 280]],
   ["docs/brand/bumpster-mark.png", [1200, 560]],
   ["docs/brand/bumpster-social-card.png", [1200, 630]],
   ["website/public/apple-touch-icon.png", [180, 180]],

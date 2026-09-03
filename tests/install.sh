@@ -272,6 +272,12 @@ test_clean_install() {
   )" || fail "Installed runtime help failed" || return 1
   assert_contains "$help_output" "Bumpster 0.9.0" \
     "Installed runtime help reports the wrong version" || return 1
+  assert_contains "$help_output" "| X |.| Y |.| Z |  BUMPSTER" \
+    "Installed runtime help is missing the uppercase Terminal identity" ||
+    return 1
+  assert_contains "$help_output" $'+---+ +---+ +---+\n\nBumpster 0.9.0' \
+    "Installed runtime help does not separate the Terminal identity" ||
+    return 1
   assert_minimal_installation "$target_home" || return 1
   assert_no_temporary_directories "$home_dir" || return 1
   assert_contains "$output" "Bumpster 0.9.0 installed" \

@@ -60,7 +60,7 @@
 
   <g transform="translate(1148 620)" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="27" font-weight="700" fill="#f8f3eb" xml:space="preserve">
     <text y="0">+---+ +---+ +-<tspan fill="#e7a06c">^</tspan>-+</text>
-    <text y="46">| x |.| y |.| z |  BUMPSTER</text>
+    <text y="46">| X |.| Y |.| <tspan fill="#e7a06c">Z</tspan> |  BUMPSTER</text>
     <text y="92">+---+ +---+ +---+</text>
   </g>
 
@@ -68,7 +68,7 @@
   <text x="1148" y="828" fill="#bdb5aa" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" letter-spacing="2">NO_COLOR=1</text>
   <g transform="translate(1148 900)" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="27" font-weight="700" fill="#f8f3eb" xml:space="preserve">
     <text y="0">+---+ +---+ +-^-+</text>
-    <text y="46">| x |.| y |.| z |  BUMPSTER</text>
+    <text y="46">| X |.| Y |.| Z |  BUMPSTER</text>
     <text y="92">+---+ +---+ +---+</text>
   </g>
 

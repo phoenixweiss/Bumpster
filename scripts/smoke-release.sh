@@ -286,7 +286,14 @@ verify_installed_cli() {
       "$target_home/bin/bumpster" --help
   )" || return 1
   assert_contains "$help_output" "Bumpster $release_version" \
-    "Installed CLI help reports the wrong version"
+    "Installed CLI help reports the wrong version" || return 1
+  assert_contains "$help_output" "| X |.| Y |.| Z |  BUMPSTER" \
+    "Installed CLI help is missing the uppercase Terminal identity" || return 1
+  assert_contains "$help_output" \
+    "+---+ +---+ +---+
+
+Bumpster $release_version" \
+    "Installed CLI help does not separate the Terminal identity"
 }
 
 run_installer() {

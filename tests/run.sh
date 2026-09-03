@@ -420,6 +420,7 @@ test_cli_delegates_release_execution() {
 }
 
 test_cli_help_and_version_contract() {
+  local expected_logo_block
   local expected_version
   local expected_entry
   local expected_entries=(
@@ -452,6 +453,10 @@ test_cli_help_and_version_contract() {
   run_bumpster --help
 
   assert_equal "0" "$cli_status" "Help command failed: $cli_output" || return 1
+  expected_logo_block=$'\n+---+ +---+ +-^-+\n| X |.| Y |.| Z |  BUMPSTER\n+---+ +---+ +---+\n\nBumpster '
+  if [[ "$cli_output" != "$expected_logo_block"* ]]; then
+    fail "Help must surround the Terminal logo with blank lines" || return 1
+  fi
   for expected_entry in "${expected_entries[@]}"; do
     assert_contains "$cli_output" "$expected_entry" \
       "Help is missing the public contract entry" || return 1
@@ -464,6 +469,53 @@ test_cli_help_and_version_contract() {
     return 1
   assert_equal "Bumpster version: $expected_version" "$cli_output" \
     "Version output does not match VERSION"
+}
+
+test_cli_logo_colors_respect_terminal_and_no_color() {
+  local color_output
+  local expected_color_block
+  local no_color_output
+
+  color_output="$(
+    HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      TERM="xterm-256color" \
+      bash -c '
+        unset NO_COLOR
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        log_output_is_terminal() {
+          return 0
+        }
+        usage
+      ' bumpster-logo-color-test "$project_root"
+  )" || return 1
+
+  expected_color_block=$'\n+---+ +---+ +-\033[1;33m^\033[0m-+\n| X |.| Y |.| \033[1;33mZ\033[0m |  BUMPSTER\n+---+ +---+ +---+\n\nBumpster '
+  if [[ "$color_output" != "$expected_color_block"* ]]; then
+    fail "Interactive help does not highlight the patch caret and Z" ||
+      return 1
+  fi
+
+  no_color_output="$(
+    HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      NO_COLOR="1" \
+      TERM="xterm-256color" \
+      bash -c '
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        log_output_is_terminal() {
+          return 0
+        }
+        usage
+      ' bumpster-logo-color-test "$project_root"
+  )" || return 1
+
+  assert_not_contains "$no_color_output" $'\033[' \
+    "NO_COLOR did not disable Terminal identity color" || return 1
+  assert_contains "$no_color_output" "| X |.| Y |.| Z |  BUMPSTER" \
+    "NO_COLOR changed the Terminal identity text"
 }
 
 test_cli_rejects_ambiguous_actions_without_mutation() {
@@ -2152,6 +2204,7 @@ main() {
   run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
   run_test "CLI delegates release execution to the release functions" test_cli_delegates_release_execution
   run_test "CLI help and version expose the stable contract" test_cli_help_and_version_contract
+  run_test "CLI identity colors only the patch bump in a terminal" test_cli_logo_colors_respect_terminal_and_no_color
   run_test "CLI rejects ambiguous actions without mutation" test_cli_rejects_ambiguous_actions_without_mutation
   run_test "install and update flows are transactional" test_install_and_update_suite
   run_test "status uses the default branch configuration" test_status_uses_default_configuration

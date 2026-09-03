@@ -63,6 +63,44 @@ log_highlighted() {
   log "$message" "INFO" "$terminal_message"
 }
 
+# Print the Terminal identity with its patch bump highlighted only when stdout
+# is an interactive terminal. Redirected output remains plain ASCII.
+print_logo() {
+  local accent
+  local line
+  local line_number=0
+  local reset
+
+  printf '\n'
+  if [ ! -f "$logo_file" ]; then
+    printf 'Bumpster\n\n'
+    return
+  fi
+
+  if [[ -n "${NO_COLOR:-}" || "${TERM:-}" == "dumb" ]] ||
+    ! log_output_is_terminal 1; then
+    cat "$logo_file"
+    printf '\n'
+    return
+  fi
+
+  printf -v accent '\033[1;33m'
+  printf -v reset '\033[0m'
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line_number=$((line_number + 1))
+    case "$line_number" in
+      1)
+        line="${line/\^/$accent^$reset}"
+        ;;
+      2)
+        line="${line/ Z / ${accent}Z${reset} }"
+        ;;
+    esac
+    printf '%s\n' "$line"
+  done < "$logo_file"
+  printf '\n'
+}
+
 # Function to run custom hooks (project-level takes priority over global)
 run_hook() {
   local hook_name="$1"
@@ -880,11 +918,7 @@ usage() {
   local local_version
   local version_info
 
-  if [ -f "$logo_file" ]; then
-    cat "$logo_file"
-  else
-    echo "Bumpster"
-  fi
+  print_logo
 
   local_version=$(display_version)
   version_info="$local_version"
