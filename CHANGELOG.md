@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-03
+
 ### Changed
 
 - The Flat and Terminal release counters now use uppercase `X.Y.Z` symbols
@@ -17,6 +19,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   lockups are larger in the header, closing section, and mobile layout.
 - CLI help now separates the Terminal logo from surrounding output with blank
   lines and highlights both the patch caret and `Z` in interactive color output.
+- Terminal logo output normalizes line endings so spacing and color remain
+  consistent in Windows Git Bash checkouts.
 
 ## [1.2.1] - 2026-09-03
 
@@ -373,7 +377,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.1.0...v1.1.1
