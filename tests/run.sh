@@ -473,8 +473,13 @@ test_cli_help_and_version_contract() {
 
 test_cli_logo_colors_respect_terminal_and_no_color() {
   local color_output
+  local crlf_logo_file
+  local crlf_output
   local expected_color_block
+  local expected_plain_block
   local no_color_output
+
+  create_fixture "cli-logo-colors" || return 1
 
   color_output="$(
     HOME="$fixture_home" \
@@ -515,7 +520,30 @@ test_cli_logo_colors_respect_terminal_and_no_color() {
   assert_not_contains "$no_color_output" $'\033[' \
     "NO_COLOR did not disable Terminal identity color" || return 1
   assert_contains "$no_color_output" "| X |.| Y |.| Z |  BUMPSTER" \
-    "NO_COLOR changed the Terminal identity text"
+    "NO_COLOR changed the Terminal identity text" || return 1
+
+  crlf_logo_file="$fixture_home/BUMPSTER_LOGO.CRLF.ASCII"
+  printf '%s\r\n' \
+    "+---+ +---+ +-^-+" \
+    "| X |.| Y |.| Z |  BUMPSTER" \
+    "+---+ +---+ +---+" > "$crlf_logo_file" || return 1
+  crlf_output="$(
+    HOME="$fixture_home" \
+      BUMPSTER_HOME="$project_root" \
+      NO_COLOR="1" \
+      TERM="xterm-256color" \
+      bash -c '
+        source "$1/config.sh"
+        source "$1/lib/functions.sh"
+        logo_file="$2"
+        usage
+      ' bumpster-logo-crlf-test "$project_root" "$crlf_logo_file"
+  )" || return 1
+
+  expected_plain_block=$'\n+---+ +---+ +-^-+\n| X |.| Y |.| Z |  BUMPSTER\n+---+ +---+ +---+\n\nBumpster '
+  if [[ "$crlf_output" != "$expected_plain_block"* ]]; then
+    fail "Help does not normalize a CRLF Terminal identity" || return 1
+  fi
 }
 
 test_cli_rejects_ambiguous_actions_without_mutation() {

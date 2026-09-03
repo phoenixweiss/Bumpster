@@ -67,6 +67,7 @@ log_highlighted() {
 # is an interactive terminal. Redirected output remains plain ASCII.
 print_logo() {
   local accent
+  local color_enabled=false
   local line
   local line_number=0
   local reset
@@ -77,25 +78,26 @@ print_logo() {
     return
   fi
 
-  if [[ -n "${NO_COLOR:-}" || "${TERM:-}" == "dumb" ]] ||
-    ! log_output_is_terminal 1; then
-    cat "$logo_file"
-    printf '\n'
-    return
+  if [[ -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]] &&
+    log_output_is_terminal 1; then
+    color_enabled=true
+    printf -v accent '\033[1;33m'
+    printf -v reset '\033[0m'
   fi
 
-  printf -v accent '\033[1;33m'
-  printf -v reset '\033[0m'
   while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
     line_number=$((line_number + 1))
-    case "$line_number" in
-      1)
-        line="${line/\^/$accent^$reset}"
-        ;;
-      2)
-        line="${line/ Z / ${accent}Z${reset} }"
-        ;;
-    esac
+    if [[ "$color_enabled" == "true" ]]; then
+      case "$line_number" in
+        1)
+          line="${line/\^/$accent^$reset}"
+          ;;
+        2)
+          line="${line/ Z / ${accent}Z${reset} }"
+          ;;
+      esac
+    fi
     printf '%s\n' "$line"
   done < "$logo_file"
   printf '\n'
