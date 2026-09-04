@@ -20,6 +20,10 @@ PNG companions are included for tools and surfaces that cannot consume SVG.
 The SVG lockup uses an outlined IBM Plex Mono Bold wordmark and has no runtime
 font dependency.
 
+The Flat wordmark uses optical pair spacing rather than a uniform monospace
+advance. Preserve the individual glyph offsets in the SVG master when exporting
+or reusing it; glyph shapes, cap height, and baseline remain unchanged.
+
 ## Terminal form
 
 ```text

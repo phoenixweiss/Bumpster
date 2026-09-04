@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-09-04
+
+### Changed
+
+- The Flat wordmark now uses optical kerning for a more balanced visual rhythm
+  across the website, READMEs, brand reference sheet, and social-preview graphics.
+  Glyph shapes, cap height, baseline, and the Terminal ASCII logo are unchanged.
+
 ## [1.2.2] - 2026-09-03
 
 ### Changed
@@ -377,7 +385,8 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.1.1...v1.2.0
