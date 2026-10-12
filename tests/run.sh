@@ -2302,7 +2302,14 @@ test_package_rejections() {
       absolute) printf '{"versionFile":"/tmp/VERSION","packageJson":"packages/ui/package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
       symlink) rm "$fixture_worktree/packages/ui/VERSION"; ln -s ../../VERSION "$fixture_worktree/packages/ui/VERSION" ;;
       hardlink) rm "$fixture_worktree/packages/ui/VERSION"; ln "$fixture_worktree/VERSION" "$fixture_worktree/packages/ui/VERSION" ;;
-      directory-link) mv "$fixture_worktree/packages/ui" "$fixture_root/external-ui"; ln -s "$fixture_root/external-ui" "$fixture_worktree/packages/ui" ;;
+      directory-link)
+        mv "$fixture_worktree/packages/ui" "$fixture_root/external-ui" || return 1
+        node -e '
+          const fs = require("fs");
+          fs.symlinkSync(process.argv[1], process.argv[2], process.platform === "win32" ? "junction" : "dir");
+          if (!fs.lstatSync(process.argv[2]).isSymbolicLink()) process.exit(1);
+        ' "$fixture_root/external-ui" "$fixture_worktree/packages/ui" || return 1
+        ;;
       root) printf '{"versionFile":"VERSION","packageJson":"package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
       overlap) cp "$fixture_worktree/.bumpster/packages/ui.json" "$fixture_worktree/.bumpster/packages/brand.json" ;;
       duplicate-prefix) printf '{"versionFile":"packages/brand/VERSION","packageJson":"packages/brand/package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/brand.json" ;;
@@ -2311,7 +2318,10 @@ test_package_rejections() {
       missing) rm "$fixture_worktree/packages/ui/VERSION" ;;
       untracked) git -C "$fixture_worktree" rm --cached -q .bumpster/packages/ui.json ;;
     esac
-    git -C "$fixture_worktree" add . || return 1
+    # Keep the directory link uncommitted: Git may follow a Windows junction.
+    if [[ "$scenario" != directory-link ]]; then
+      git -C "$fixture_worktree" add . || return 1
+    fi
     if [[ "$scenario" == untracked ]]; then
       git -C "$fixture_worktree" rm --cached -q .bumpster/packages/ui.json || return 1
     fi
@@ -2321,6 +2331,9 @@ test_package_rejections() {
     expected_tags="$(git -C "$fixture_worktree" tag --list)"
     run_bumpster --package ui --patch
     [[ "$cli_status" != 0 ]] || { fail "Accepted $scenario: $cli_output"; return 1; }
+    if [[ "$scenario" == directory-link ]]; then
+      assert_contains "$cli_output" "symlink in packages/ui/VERSION" || return 1
+    fi
     assert_equal "$initial_refs" "$(git --git-dir="$fixture_origin" show-ref)" "$scenario changed origin" || return 1
     assert_equal "$expected_tags" "$(git -C "$fixture_worktree" tag --list)" || return 1
     assert_equal 0.8.0 "$(cat "$fixture_worktree/VERSION")" || return 1
