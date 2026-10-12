@@ -64,7 +64,7 @@ export const content = {
         {
           number: "02",
           title: "Version",
-          text: "Update `VERSION` and optionally the root `package.json` field.",
+          text: "Update root `VERSION`, or the explicitly selected package’s version file and manifest.",
           command: "1.4.2 → 1.4.3",
         },
         {
@@ -104,7 +104,7 @@ export const content = {
       eyebrow: "CLI REFERENCE",
       title: "A small command surface.",
       intro:
-        "Use one action per invocation. Run without an option for an interactive major, minor, or patch prompt.",
+        "Use one action per invocation. Add --package KEY to release one package. Without an action, choose major, minor, or patch interactively.",
       items: [
         ["-M", "--major", "Publish a major release"],
         ["-m", "--minor", "Publish a minor release"],
@@ -127,6 +127,10 @@ export const content = {
       eyebrow: "FIT YOUR WORKFLOW",
       title: "Make Bumpster fit your workflow.",
       configTab: "Configuration",
+      packagesTab: "Packages",
+      packagesTitle: "Independent package releases",
+      packagesText:
+        "Run from the repository root with Node.js installed. Track one JSON profile per package and keep its version file and manifest in sync. `--package ui` updates only ui and creates `ui/vX.Y.Z`; root and neighboring versions stay unchanged. Branches and atomic publication use the same release flow. Update consumer dependencies separately; a separate CI publishes npm packages. Without `--package`, the existing single-product flow stays the same.",
       hooksTab: "Hooks",
       featureTab: "Branches",
       hotfixTab: "Hotfix",
@@ -241,7 +245,7 @@ export const content = {
         {
           number: "02",
           title: "Версия",
-          text: "Обновить `VERSION` и при необходимости корневое поле `package.json`.",
+          text: "Обновить корневой `VERSION` или файл версии и манифест явно выбранного пакета.",
           command: "1.4.2 → 1.4.3",
         },
         {
@@ -281,7 +285,7 @@ export const content = {
       eyebrow: "СПРАВОЧНИК CLI",
       title: "Небольшой набор команд.",
       intro:
-        "Используйте одно действие за запуск. Без опций откроется интерактивный выбор major, minor или patch.",
+        "Используйте одно действие за запуск. Добавьте --package KEY для выпуска одного пакета. Без действия выберите major, minor или patch интерактивно.",
       items: [
         ["-M", "--major", "Опубликовать major-релиз"],
         ["-m", "--minor", "Опубликовать minor-релиз"],
@@ -300,6 +304,10 @@ export const content = {
       eyebrow: "ПОД ВАШ ПРОЦЕСС",
       title: "Настройте Bumpster под свой процесс.",
       configTab: "Конфигурация",
+      packagesTab: "Пакеты",
+      packagesTitle: "Независимые релизы пакетов",
+      packagesText:
+        "Запускайте из корня репозитория с установленным Node.js. Храните в Git JSON-профиль каждого пакета; версии в отдельном файле и манифесте должны совпадать. `--package ui` обновляет только ui и создаёт `ui/vX.Y.Z`; корневая и соседние версии сохраняются. Ветки и атомарная публикация используют прежний процесс релиза. Зависимости потребителей обновляйте отдельно; npm-пакеты публикует отдельный CI. Без `--package` сохраняется прежний выпуск одного продукта.",
       hooksTab: "Хуки",
       featureTab: "Ветки",
       hotfixTab: "Хотфикс",

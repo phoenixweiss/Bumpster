@@ -135,3 +135,18 @@ git commit -m "Fix urgent issue"
 
 # Publish the patch release
 bumpster --hotfix`;
+
+export const packageExample = `# .bumpster/packages/ui.json
+{
+  "versionFile":
+    "packages/ui/VERSION",
+  "packageJson":
+    "packages/ui/package.json",
+  "tagPrefix": "ui/v"
+}
+
+# Check profile and versions
+bumpster --package ui --status
+
+# Release ui; tag ui/v0.1.1
+bumpster --package ui --patch`;

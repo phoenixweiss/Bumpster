@@ -13,6 +13,7 @@ import {
   homebrewUninstallCommand,
   homebrewUpdateCommand,
   hooksExample,
+  packageExample,
   pathCommand,
   standaloneInstallCommand,
   standaloneUninstallCommand,
@@ -81,6 +82,11 @@ const guide = computed(() => {
       title: t.value.configure.configTitle,
       text: t.value.configure.configText,
       code: configExample,
+    },
+    packages: {
+      title: t.value.configure.packagesTitle,
+      text: t.value.configure.packagesText,
+      code: packageExample,
     },
     hooks: {
       title: t.value.configure.hooksTitle,
@@ -479,6 +485,17 @@ async function copyText(key, value) {
               @click="activeGuide = 'config'"
             >
               {{ t.configure.configTab }}
+            </button>
+            <button
+              id="packages-tab"
+              type="button"
+              role="tab"
+              :aria-selected="activeGuide === 'packages'"
+              aria-controls="guide-panel"
+              :class="{ active: activeGuide === 'packages' }"
+              @click="activeGuide = 'packages'"
+            >
+              {{ t.configure.packagesTab }}
             </button>
             <button
               id="hooks-tab"

@@ -16,6 +16,7 @@ import {
   homebrewUninstallCommand,
   homebrewUpdateCommand,
   hooksExample,
+  packageExample,
   pathCommand,
   standaloneInstallCommand,
   standaloneUninstallCommand,
@@ -234,6 +235,46 @@ for (const [shortOption, longOption] of englishCommands) {
     contract,
     `\`${shortOption}\`, \`${longOption}\``,
     "Website command is missing from the CLI contract",
+  );
+}
+
+for (const value of [
+  "versionFile",
+  "packageJson",
+  "tagPrefix",
+  "packages/ui/VERSION",
+  "packages/ui/package.json",
+  "ui/v",
+  "--package ui --status",
+  "--package ui --patch",
+]) {
+  assertIncludes(packageExample, value, "Package example is incomplete");
+  assertIncludes(
+    contract.replace(/\s+/g, " "),
+    value,
+    "Package example differs from CLI contract",
+  );
+  assertIncludes(
+    contractRu.replace(/\s+/g, " "),
+    value,
+    "Package example differs from Russian contract",
+  );
+}
+assertIncludes(
+  cliHelp,
+  "--package KEY",
+  "Package modifier is missing from CLI help",
+);
+for (const locale of [content.en, content.ru]) {
+  assertIncludes(
+    locale.configure.packagesText,
+    "Node.js",
+    "Package runtime requirement is missing",
+  );
+  assertIncludes(
+    locale.configure.packagesText,
+    "--package ui",
+    "Explicit package selection is missing",
   );
 }
 

@@ -839,7 +839,15 @@ a {
 
 .configure-tabs {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+}
+
+@media (min-width: 981px) {
+  .configure-section .split-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 48px;
+  }
 }
 
 .configure-tabs button {
