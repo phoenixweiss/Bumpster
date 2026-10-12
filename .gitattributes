@@ -1,0 +1,3 @@
+# Keep release version files consistent in Git Bash checkouts.
+VERSION text eol=lf
+website/VERSION text eol=lf

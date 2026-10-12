@@ -2428,8 +2428,10 @@ test_repository_website_releases() {
   mkdir -p "$fixture_worktree/.bumpster/packages" "$fixture_worktree/website" || return 1
   cp "$project_root/.bumpster/packages/website.json" "$fixture_worktree/.bumpster/packages/website.json" || return 1
   cp "$project_root/website/VERSION" "$project_root/website/package.json" "$fixture_worktree/website/" || return 1
-  git -C "$fixture_worktree" add .bumpster/packages/website.json website/VERSION website/package.json || return 1
+  cp "$project_root/.gitattributes" "$fixture_worktree/.gitattributes" || return 1
+  git -C "$fixture_worktree" add .gitattributes .bumpster/packages/website.json website/VERSION website/package.json || return 1
   git -C "$fixture_worktree" commit -q -m "Configure website fixture" || return 1
+  git -C "$fixture_worktree" -c core.autocrlf=true checkout-index -f -- VERSION website/VERSION || return 1
   git -C "$fixture_worktree" push -q origin dev || return 1
   run_bumpster --package website --status
   assert_equal 0 "$cli_status" "$cli_output" || return 1
