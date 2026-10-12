@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-13
+
 ### Added
 
 - Configure this repository's website as an independent package target, preserving
