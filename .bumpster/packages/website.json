@@ -1,0 +1,5 @@
+{
+  "versionFile": "website/VERSION",
+  "packageJson": "website/package.json",
+  "tagPrefix": "website/v"
+}

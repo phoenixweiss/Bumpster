@@ -11,6 +11,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Configure this repository's website as an independent package target, preserving
+  its initial `0.0.0` version. Pages uses `website/vX.Y.Z` tags separately from
+  CLI runtime releases; website builds verify and expose both versions.
+
 - Explicit `--package KEY` releases and read-only target status using tracked
   JSON profiles, isolated version files/manifests, and package tag namespaces.
   Package releases retain the atomic Git and hotfix flows, validate target paths

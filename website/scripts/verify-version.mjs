@@ -25,6 +25,25 @@ assert(
   "Root VERSION must contain MAJOR.MINOR.PATCH.",
 );
 
+const websiteVersion = (
+  await readFile(join(websiteRoot, "VERSION"), "utf8")
+).trim();
+const manifest = JSON.parse(
+  await readFile(join(websiteRoot, "package.json"), "utf8"),
+);
+const builtVersions = JSON.parse(
+  await readFile(join(distRoot, "version.json"), "utf8"),
+);
+assert(
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(websiteVersion) &&
+    manifest.version === websiteVersion,
+  "Website VERSION must match the package.json semantic version.",
+);
+assert(
+  builtVersions.cli === version && builtVersions.website === websiteVersion,
+  "Built version.json must match the CLI and website versions.",
+);
+
 async function verifyLocale(label, htmlFile) {
   const html = await readFile(join(distRoot, htmlFile), "utf8");
   const scriptSources = [
@@ -62,4 +81,6 @@ await Promise.all([
   verifyLocale("Russian", "ru/index.html"),
 ]);
 
-console.log(`Website output includes Bumpster v${version} in both locales.`);
+console.log(
+  `Website v${websiteVersion} output includes Bumpster CLI v${version} in both locales.`,
+);

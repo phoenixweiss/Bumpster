@@ -649,6 +649,32 @@ lockfiles need a separate reviewed update; npm publication belongs to separate C
 See the [package CLI contract](docs/CLI_CONTRACT.md#independent-package-releases)
 for path validation, profile collisions, hooks, and the consumer update plan.
 
+### Releases in this repository
+
+The CLI keeps the root `VERSION` and `vX.Y.Z` tags. Release it with the usual
+`bumpster --patch` command. The website uses `.bumpster/packages/website.json`,
+`website/VERSION`, and `website/package.json` with `website/vX.Y.Z` tags:
+
+```sh
+bumpster --package website --status
+bumpster --package website --patch
+```
+
+Run these commands from the repository root using the CLI from this checkout
+(or an installed version that supports `--package`). Both targets retain the
+`dev` → `main` → `dev` flow. A CLI release publishes the runtime and GitHub Release;
+a website tag builds and deploys Pages independently. Manual Pages deployment
+also accepts only annotated `website/vX.Y.Z` tags published on `origin/main`.
+CLI tags no longer trigger Pages. Website releases do not publish npm packages
+or create GitHub Releases, so CLI installation and self-update keep their
+existing release source.
+
+The site's initial independent version is `0.0.0`, preserving its existing
+manifest value; this configuration does not create a release. The footer still
+identifies the CLI version documented by the site. The build also emits
+`version.json` with separate `cli` and `website` values and checks both against
+the source files. Dependency and lockfile updates remain separate actions.
+
 ## Author
 
 Created and maintained by [Pavel Tkachev (@phoenixweiss)](https://github.com/phoenixweiss).

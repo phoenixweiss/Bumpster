@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "website/**"
+      - "VERSION"
+      - ".bumpster/packages/website.json"
       - "docs/brand/**"
       - "README.md"
       - "README_RU.md"
@@ -17,6 +19,8 @@ on:
       - main
     paths:
       - "website/**"
+      - "VERSION"
+      - ".bumpster/packages/website.json"
       - "docs/brand/**"
       - "README.md"
       - "README_RU.md"

@@ -2419,6 +2419,55 @@ test_package_parser() {
   assert_equal 'VERSION' "$(git -C "$fixture_worktree" diff --name-only "$before" HEAD)"
 }
 
+test_repository_website_releases() {
+  local cli_version website_version release_commit validator
+  cli_version="$(cat "$project_root/VERSION")" || return 1
+  website_version="$(cat "$project_root/website/VERSION")" || return 1
+  validator="$project_root/website/scripts/validate-release.mjs"
+  create_fixture repository-website "$cli_version" || return 1
+  mkdir -p "$fixture_worktree/.bumpster/packages" "$fixture_worktree/website" || return 1
+  cp "$project_root/.bumpster/packages/website.json" "$fixture_worktree/.bumpster/packages/website.json" || return 1
+  cp "$project_root/website/VERSION" "$project_root/website/package.json" "$fixture_worktree/website/" || return 1
+  git -C "$fixture_worktree" add .bumpster/packages/website.json website/VERSION website/package.json || return 1
+  git -C "$fixture_worktree" commit -q -m "Configure website fixture" || return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+  run_bumpster --package website --status
+  assert_equal 0 "$cli_status" "$cli_output" || return 1
+  run_bumpster --package website --patch
+  assert_equal 0 "$cli_status" "$cli_output" || return 1
+  local next_website
+  next_website="$(cat "$fixture_worktree/website/VERSION")" || return 1
+  [[ "$next_website" != "$website_version" ]] || return 1
+  assert_equal "$cli_version" "$(cat "$fixture_worktree/VERSION")" || return 1
+  release_commit="$(git -C "$fixture_worktree" rev-parse HEAD)" || return 1
+  (
+    cd "$fixture_worktree" || exit 1
+    PATH="$test_path" node "$validator" "website/v$next_website" "$release_commit" main || exit 1
+    if PATH="$test_path" node "$validator" "v$cli_version" "$release_commit" main >/dev/null 2>&1; then exit 1; fi
+    if PATH="$test_path" node "$validator" "website/v$next_website" "0000000000000000000000000000000000000000" main >/dev/null 2>&1; then exit 1; fi
+    git --git-dir="$fixture_origin" update-ref -d "refs/tags/website/v$next_website" || exit 1
+    if PATH="$test_path" node "$validator" "website/v$next_website" "" main >/dev/null 2>&1; then exit 1; fi
+    git push -q origin "refs/tags/website/v$next_website" || exit 1
+    git --git-dir="$fixture_origin" update-ref refs/heads/main "$release_commit^" || exit 1
+    if PATH="$test_path" node "$validator" "website/v$next_website" "" main >/dev/null 2>&1; then exit 1; fi
+    git --git-dir="$fixture_origin" update-ref refs/heads/main "$release_commit" || exit 1
+  ) || { fail "Website deployment validation failed"; return 1; }
+  run_bumpster --patch
+  assert_equal 0 "$cli_status" "$cli_output" || return 1
+  assert_equal "$next_website" "$(cat "$fixture_worktree/website/VERSION")" || return 1
+  assert_contains "$(cat "$fixture_worktree/website/package.json")" "\"version\": \"$next_website\"" || return 1
+  (
+    cd "$fixture_worktree" || exit 1
+    git checkout -q --detach "$release_commit" || exit 1
+    # Manual deployment of a prior website release remains valid after a CLI release.
+    PATH="$test_path" node "$validator" "website/v$next_website" "" main || exit 1
+    git tag "website/v9.9.9" || exit 1
+    if PATH="$test_path" node "$validator" website/v9.9.9 "" main >/dev/null 2>&1; then exit 1; fi
+    git tag -a website/v9.9.8 -m "Invalid version" || exit 1
+    if PATH="$test_path" node "$validator" website/v9.9.8 "" main >/dev/null 2>&1; then exit 1; fi
+  ) || { fail "Website redeployment or refusal checks failed"; return 1; }
+}
+
 main() {
   local node_binary=""
 
@@ -2442,6 +2491,7 @@ main() {
   suite_root="$(mktemp -d "${TMPDIR:-/tmp}/bumpster-tests.XXXXXX")" ||
     fail "Could not create the test directory" || return 1
 
+  run_test "repository CLI and website versions release independently; Pages validates website tags" test_repository_website_releases
   run_test "selected package releases preserve neighboring versions and dependencies" test_package_release
   run_test "package hotfix preserves unpublished development and returns to dev" test_package_hotfix
   run_test "package preflight rejects unsafe profiles, tags and hooks" test_package_rejections
