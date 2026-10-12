@@ -424,7 +424,7 @@ for (const sourceMessage of [
   'log "Release preflight checks passed."',
   '"Release plan: $release_current_version -> $release_new_version ($release_version_type)."',
   '"Created version commit for $release_new_version."',
-  "\"Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically.\"",
+  "\"Publishing '$release_develop_branch', '$release_master_branch', and tag '${release_tag_prefix}$release_new_version' atomically.\"",
   'log "Release branches and tag published successfully."',
   "log \"Returning to branch '$release_after_branch'.\"",
 ]) {
