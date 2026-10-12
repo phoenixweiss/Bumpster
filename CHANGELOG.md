@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Explicit `--package KEY` releases and read-only target status using tracked
+  JSON profiles, isolated version files/manifests, and package tag namespaces.
+  Package releases retain the atomic Git and hotfix flows, validate target paths
+  and profile collisions, and expose the selected target to hooks. Dependencies
+  and npm publication remain separate actions; single-product behavior is unchanged.
+
 ## [1.2.3] - 2026-09-04
 
 ### Changed

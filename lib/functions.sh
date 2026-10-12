@@ -127,6 +127,84 @@ run_hook() {
   fi
 }
 
+# Resolve exactly one tracked package profile; never evaluate profile data as code.
+resolve_release_target() {
+  release_version_file="VERSION"
+  release_package_json="package.json"
+  release_tag_prefix="v"
+  [[ -n "${selected_package:-}" ]] || return 0
+  require_git_repository
+  local target_data
+  target_data="$(node - "$selected_package" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const cp = require("child_process");
+try {
+  const root = cp.execFileSync("git", ["rev-parse", "--show-toplevel"], {encoding:"utf8"}).trim();
+  if (fs.realpathSync(".") !== fs.realpathSync(root)) throw new Error("run package commands from the repository root");
+  const tracked = p => cp.execFileSync("git", ["--literal-pathspecs", "ls-files", "--error-unmatch", "--", p], {stdio:"pipe"});
+  const safeFile = p => {
+    if (typeof p !== "string" || !p || /[\\\r\n]/.test(p) || path.isAbsolute(p) ||
+        p.split("/").some(c => !c || c === "." || c === ".." || c === ".git"))
+      throw new Error("paths must be normalized repository-relative files");
+    let current = ".";
+    for (const c of p.split("/")) {
+      current = path.join(current,c);
+      if (fs.lstatSync(current).isSymbolicLink()) throw new Error(`symlink in ${p}`);
+    }
+    if (fs.statSync(p).nlink > 1) throw new Error(`hard link at ${p}`);
+    if (!fs.statSync(p).isFile()) throw new Error(`${p} must be a regular file`);
+    const relative = path.relative(fs.realpathSync(root), fs.realpathSync(p));
+    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+      throw new Error(`${p} resolves outside the repository`);
+    tracked(p);
+  };
+  const directory = ".bumpster/packages";
+  safeFile(`${directory}/${process.argv[2]}.json`);
+  const paths = new Set(), prefixes = new Set();
+  let selected;
+  for (const name of fs.readdirSync(directory).filter(n => n.endsWith(".json"))) {
+    const profile = `${directory}/${name}`;
+    safeFile(profile);
+    const data = JSON.parse(fs.readFileSync(profile,"utf8"));
+    if (!data || Array.isArray(data) || Object.keys(data).sort().join(",") !== "packageJson,tagPrefix,versionFile")
+      throw new Error(`${profile} requires only versionFile, packageJson, tagPrefix`);
+    safeFile(data.versionFile); safeFile(data.packageJson);
+    const dir = path.dirname(data.packageJson);
+    if (dir === "." || path.basename(data.packageJson) !== "package.json" ||
+        path.dirname(data.versionFile) !== dir || data.versionFile === data.packageJson)
+      throw new Error("version file and package.json must be distinct files in one package directory below root");
+    for (const p of [data.versionFile,data.packageJson]) {
+      if (paths.has(p)) throw new Error("package profiles must not share version files or manifests");
+      paths.add(p);
+    }
+    if (typeof data.tagPrefix !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_/-]*\/v$/.test(data.tagPrefix))
+      throw new Error("tagPrefix must be a package namespace ending in /v");
+    cp.execFileSync("git", ["check-ref-format", `refs/tags/${data.tagPrefix}0.0.0`], {stdio:"pipe"});
+    if (prefixes.has(data.tagPrefix)) throw new Error("package tag prefixes must be unique");
+    prefixes.add(data.tagPrefix);
+    if (name === `${process.argv[2]}.json`) selected = data;
+  }
+  const version = fs.readFileSync(selected.versionFile,"utf8").replace(/\n+$/, "");
+  if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version))
+    throw new Error("version file must contain MAJOR.MINOR.PATCH");
+  const manifest = JSON.parse(fs.readFileSync(selected.packageJson,"utf8"));
+  if (!manifest || Array.isArray(manifest) || manifest.version !== version)
+    throw new Error("selected manifest version must match the version file");
+  console.log(selected.versionFile); console.log(selected.packageJson); console.log(selected.tagPrefix);
+} catch (error) {
+  console.error(`Invalid package target: ${error.message}`); process.exit(1);
+}
+NODE
+  )" || abort "Could not resolve the selected package (Node.js is required)."
+  { IFS= read -r release_version_file; IFS= read -r release_package_json; IFS= read -r release_tag_prefix; } <<< "$target_data"
+  sync_with_package_json="true"
+  export BUMPSTER_PACKAGE="$selected_package"
+  export BUMPSTER_VERSION_FILE="$release_version_file"
+  export BUMPSTER_PACKAGE_JSON="$release_package_json"
+  log "Package '$selected_package': $release_version_file, $release_package_json, tags ${release_tag_prefix}*."
+}
+
 # Function to validate package.json before any release mutation
 validate_package_json_for_sync() {
   local package_file="$1"
@@ -931,6 +1009,7 @@ Usage:  bumpster [action]
         Run without an action to select a release type interactively.
         Choose only one action per invocation.
 
+        --package KEY               Select .bumpster/packages/KEY.json for release/status
         -h, --help                   Show this help message
         -M, --major                  Bump major version
         -m, --minor                  Bump minor version
@@ -1126,7 +1205,7 @@ preflight_release() {
   local new_version="$1"
   local develop_branch_name="$2"
   local master_branch_name="$3"
-  local release_tag="v$new_version"
+  local release_tag="${release_tag_prefix}$new_version"
   local remote_develop_ref="refs/remotes/origin/$develop_branch_name"
   local remote_master_ref="refs/remotes/origin/$master_branch_name"
   local local_master_ref="refs/heads/$master_branch_name"
@@ -1340,9 +1419,9 @@ validate_hotfix_release() {
     abort "Hotfix branch '$release_start_branch' contains unpublished '$release_develop_branch' history."
   fi
 
-  master_version="$(git show "$master_ref:VERSION" 2>/dev/null)" ||
+  master_version="$(git show "$master_ref:$release_version_file" 2>/dev/null)" ||
     abort "Could not read VERSION from '$release_master_branch'."
-  develop_version="$(git show "$develop_ref:VERSION" 2>/dev/null)" ||
+  develop_version="$(git show "$develop_ref:$release_version_file" 2>/dev/null)" ||
     abort "Could not read VERSION from '$release_develop_branch'."
   if [[ "$release_current_version" != "$master_version" ]]; then
     abort "Hotfix branch VERSION must match '$release_master_branch'."
@@ -1396,10 +1475,10 @@ prepare_release_plan() {
   export default_dev_branch
   export default_master_branch
 
-  if [[ ! -f "VERSION" ]]; then
+  if [[ ! -f "$release_version_file" ]]; then
     abort "VERSION file not found. Create it with a semantic version such as 0.1.0 before releasing."
   fi
-  release_current_version="$(cat VERSION)" ||
+  release_current_version="$(cat "$release_version_file")" ||
     abort "Failed to read the VERSION file."
   if [[ ! "$release_current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
     abort "VERSION must contain MAJOR.MINOR.PATCH with no prefix, suffix, or leading zeros."
@@ -1443,8 +1522,8 @@ prepare_release_plan() {
     release_after_branch="$release_develop_branch"
   fi
 
-  if [[ "${sync_with_package_json}" == "true" && -f "package.json" ]]; then
-    validate_package_json_for_sync "package.json" ||
+  if [[ "${sync_with_package_json}" == "true" && -f "$release_package_json" ]]; then
+    validate_package_json_for_sync "$release_package_json" ||
       abort "package.json cannot be synchronized safely."
   fi
 
@@ -1460,6 +1539,7 @@ prepare_release_plan() {
   export BUMPSTER_PREV_VERSION="$release_current_version"
   export BUMPSTER_NEW_VERSION="$release_new_version"
   export BUMPSTER_RELEASE_TYPE="$release_version_type"
+  export BUMPSTER_TAG="${release_tag_prefix}$release_new_version"
   log_highlighted \
     "Release plan: $release_current_version -> $release_new_version ($release_version_type)." \
     "$release_current_version" \
@@ -1471,19 +1551,19 @@ prepare_release_plan() {
 # Function to update and stage files described by the prepared release plan
 stage_release_files() {
   release_stage="updating VERSION"
-  printf '%s' "$release_new_version" > VERSION ||
+  printf '%s' "$release_new_version" > "$release_version_file" ||
     abort "Failed to write version $release_new_version to VERSION."
-  git add VERSION || abort "Failed to stage VERSION."
+  git --literal-pathspecs add -- "$release_version_file" || abort "Failed to stage VERSION."
 
   if [[ "${sync_with_package_json}" == "true" ]]; then
     release_stage="synchronizing package.json"
-    if [[ -f "package.json" ]]; then
-      log "Synchronizing version with package.json."
-      update_package_json_version "package.json" "$release_new_version" ||
-        abort "Failed to update the root package.json version safely."
-      git add package.json || abort "Failed to stage package.json."
+    if [[ -f "$release_package_json" ]]; then
+      log "Synchronizing version with $release_package_json."
+      update_package_json_version "$release_package_json" "$release_new_version" ||
+        abort "Failed to update $release_package_json version safely."
+      git --literal-pathspecs add -- "$release_package_json" || abort "Failed to stage package.json."
       log_highlighted \
-        "Updated version in package.json to $release_new_version." \
+        "Updated version in $release_package_json to $release_new_version." \
         "$release_new_version"
     else
       log "package.json not found. Skipping synchronization."
@@ -1523,8 +1603,8 @@ create_release_refs() {
       abort "Failed to fast-forward '$release_master_branch' to hotfix '$release_start_branch'."
 
     release_stage="creating the release tag"
-    git tag -a "v$release_new_version" -m "Release $release_new_version" ||
-      abort "Failed to create release tag 'v$release_new_version'."
+    git tag -a "${release_tag_prefix}$release_new_version" -m "Release $release_new_version" ||
+      abort "Failed to create release tag '${release_tag_prefix}$release_new_version'."
     return
   fi
 
@@ -1547,20 +1627,20 @@ create_release_refs() {
     abort "Failed to merge '$release_develop_branch' into '$release_master_branch'."
 
   release_stage="creating the release tag"
-  git tag -a "v$release_new_version" -m "Release $release_new_version" ||
-    abort "Failed to create release tag 'v$release_new_version'."
+  git tag -a "${release_tag_prefix}$release_new_version" -m "Release $release_new_version" ||
+    abort "Failed to create release tag '${release_tag_prefix}$release_new_version'."
 }
 
 # Function to publish all prepared release refs as one remote transaction
 publish_release_refs() {
   release_stage="atomic publication"
   log_highlighted \
-    "Publishing '$release_develop_branch', '$release_master_branch', and tag 'v$release_new_version' atomically." \
-    "v$release_new_version"
+    "Publishing '$release_develop_branch', '$release_master_branch', and tag '${release_tag_prefix}$release_new_version' atomically." \
+    "${release_tag_prefix}$release_new_version"
   git push --atomic origin \
     "$release_develop_branch" \
     "$release_master_branch" \
-    "refs/tags/v$release_new_version" ||
+    "refs/tags/${release_tag_prefix}$release_new_version" ||
     abort "Failed to publish the release atomically. Verify local and remote refs before recovery."
 
   release_published="true"
@@ -1602,7 +1682,7 @@ execute_release_plan() {
   release_diagnostics_active="true"
   release_published="false"
   release_stage="starting local release mutations"
-  release_tag_name="v$release_new_version"
+  release_tag_name="${release_tag_prefix}$release_new_version"
   trap 'release_exit_handler "$?"' EXIT
 
   stage_release_files
@@ -1627,7 +1707,22 @@ run_release() {
   fi
 
   prepare_release_plan "$requested_type"
+  local planned_head
+  planned_head="$(git rev-parse HEAD)" || abort "Could not resolve release HEAD."
   run_hook "pre-bump"
+  if [[ -n "${selected_package:-}" ]]; then
+    [[ "$(git rev-parse HEAD)" == "$planned_head" && "$(git branch --show-current)" == "$release_start_branch" ]] ||
+      abort "Pre-bump hook changed the release HEAD or branch."
+    [[ -z "$(git status --porcelain)" ]] || abort "Pre-bump hook changed the working tree."
+    local planned_target="$release_version_file|$release_package_json|$release_tag_prefix"
+    resolve_release_target
+    [[ "$planned_target" == "$release_version_file|$release_package_json|$release_tag_prefix" ]] ||
+      abort "Pre-bump hook changed the package target."
+    preflight_release "$release_new_version" "$release_develop_branch" "$release_master_branch"
+    if [[ "$release_is_hotfix" == "true" ]]; then
+      validate_hotfix_release
+    fi
+  fi
   execute_release_plan
 }
 

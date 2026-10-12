@@ -44,11 +44,18 @@ select_cli_command() {
 }
 
 # Process command-line options
+selected_package=""
 version_type=""
 selected_command=""
 selected_option=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --package)
+      [[ -z "$selected_package" && $# -ge 2 && "$2" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] ||
+        abort "--package requires one package key (letters, digits, underscore, hyphen)."
+      selected_package="$2"
+      shift
+      ;;
     -h | --help)
       select_cli_command "help" "$1"
       ;;
@@ -95,6 +102,13 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+if [[ -n "$selected_package" ]]; then
+  case "$selected_command" in
+    "" | release | status) ;;
+    *) abort "--package is supported only for releases and --status." ;;
+  esac
+fi
+
 case "$selected_command" in
   help)
     usage
@@ -122,6 +136,7 @@ esac
 
 case "$selected_command" in
   status)
+    resolve_release_target
     check_status
     exit $?
     ;;
@@ -150,12 +165,16 @@ if [ -f "$local_config_file" ]; then
 elif [ -f "$global_config_file" ]; then
   log "Using global configuration from '$global_config_file'."
   load_config "$global_config_file"
+elif [[ -n "$selected_package" ]]; then
+  log "No branch configuration found. Using default branches for the selected package."
 else
   log "No configuration file found."
   log "Running initial setup..."
   interactive_setup ||
     abort "Could not create global configuration file at '$global_config_file'."
 fi
+
+resolve_release_target
 
 # Prepare the complete release plan before the first local mutation, then run it
 run_release "$version_type"

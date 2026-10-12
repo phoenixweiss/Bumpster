@@ -622,6 +622,33 @@ The global configuration file `~/.bumpsterrc`, project-level `.bumpsterrc`
 files, and versioned backup directories are intentionally outside that path.
 Remove them separately only after checking that they are no longer needed.
 
+## Independent package releases
+
+Select one package explicitly from the repository root:
+
+```sh
+bumpster --package ui --status
+bumpster --package ui --patch
+```
+
+Commit `.bumpster/packages/ui.json` with exactly these fields:
+
+```json
+{
+  "versionFile": "packages/ui/VERSION",
+  "packageJson": "packages/ui/package.json",
+  "tagPrefix": "ui/v"
+}
+```
+
+Package mode requires Node.js and tracked regular files below the repository
+root. It updates only the selected version file and manifest, creates `ui/vX.Y.Z`,
+and preserves the existing atomic Git, hotfix, and return-to-development flow.
+Without `--package`, single-product behavior is unchanged. Dependencies and
+lockfiles need a separate reviewed update; npm publication belongs to separate CI.
+See the [package CLI contract](docs/CLI_CONTRACT.md#independent-package-releases)
+for path validation, profile collisions, hooks, and the consumer update plan.
+
 ## Author
 
 Created and maintained by [Pavel Tkachev (@phoenixweiss)](https://github.com/phoenixweiss).

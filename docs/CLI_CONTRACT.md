@@ -201,3 +201,66 @@ The following are implementation details unless documented elsewhere:
 New public surface must be documented here in English first, synchronized with
 the Russian translation, covered by regression tests, and described in the
 changelog.
+
+## Independent package releases
+
+Package mode is opt-in: run from the repository root with `bumpster --package ui
+--patch` (or `--minor`, `--major`, `--hotfix`). `bumpster --package ui` asks for
+one release type; `bumpster --package ui --status` validates and displays the
+target without fetching or changing Git state. The modifier may precede or
+follow the action. Only one package may be selected; it is not supported with
+installation, configuration creation, or branch-management actions. Create a
+hotfix branch with the existing `--create-hotfix`, then release it with
+`--package ui --hotfix`.
+
+Commit a declarative JSON profile at `.bumpster/packages/ui.json`:
+
+```json
+{
+  "versionFile": "packages/ui/VERSION",
+  "packageJson": "packages/ui/package.json",
+  "tagPrefix": "ui/v"
+}
+```
+
+The key uses letters, digits, underscores, or hyphens and starts with a letter
+or digit. Profiles accept exactly these three fields; they are data, not shell
+configuration. Node.js is required in package mode. Branches, hooks, and logging
+continue to use the existing `.bumpsterrc` configuration; the profile never
+changes those settings. If no `.bumpsterrc` exists, package mode uses the default
+branches without creating configuration. Manifest synchronization is mandatory for the selected
+package, regardless of `SYNC_WITH_PACKAGE_JSON`.
+
+Both files and all profiles must be tracked regular files with normalized
+repository-relative paths. Absolute paths, `.`/`..` components, `.git`, backslashes,
+newlines, hard links, and symlinks in any path component are rejected. The version
+file and `package.json` must be distinct files in the same directory below the
+repository root. The manifest version must equal the bare `MAJOR.MINOR.PATCH` version file.
+All profiles are checked for overlapping files and duplicate tag prefixes. A
+prefix must be a valid Git tag namespace ending in `/v`, such as `ui/v` or
+`shared/ui/v`. An invalid profile blocks package mode even when another package
+was selected.
+
+The release changes only the selected version file and manifest's top-level
+`version`. It creates `ui/vX.Y.Z`, rejects an existing local or remote target tag,
+atomically pushes the existing development/release branch graph and the selected
+tag, and returns to the configured after-bump branch. Hotfix checks compare the
+selected version file across branches. A package pre-bump hook must leave HEAD,
+the branch, and the worktree unchanged; a post-bump failure reports that the
+release has already been published. Recovery commands use the package tag.
+
+Hooks receive `BUMPSTER_PACKAGE`, `BUMPSTER_VERSION_FILE`, `BUMPSTER_PACKAGE_JSON`,
+and `BUMPSTER_TAG` in addition to the existing version and release-type variables.
+The root version, neighboring packages, dependency ranges, and lockfiles are not
+updated by package releases. Committed development changes still follow the
+existing branch merge policy. Bumpster does not publish npm packages.
+
+Before releasing a dependency, explicitly decide which consumers need its new
+version. Update their exact dependency versions and lockfiles as a separate,
+reviewed change, run their checks, and release each affected consumer with its
+own package selection. A separate CI publisher should select one package from
+its tag namespace and verify its manifest version before publishing it.
+
+Without `--package`, the existing current-directory `VERSION`, optional root
+`package.json` synchronization, `vX.Y.Z` tags, and single-product flow remain
+unchanged. Package profiles never select a target implicitly.

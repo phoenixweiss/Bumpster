@@ -2205,6 +2205,207 @@ run_test() {
   fi
 }
 
+create_package_fixture() {
+  create_fixture "$1" || return 1
+  mkdir -p "$fixture_worktree/.bumpster/packages" || return 1
+  local key
+  for key in ui brand contracts; do
+    mkdir -p "$fixture_worktree/packages/$key" || return 1
+    printf '0.1.0' > "$fixture_worktree/packages/$key/VERSION" || return 1
+    printf '{"name":"@berem/%s","version":"0.1.0","dependencies":{"@berem/contracts":"0.1.0"}}\n' "$key" \
+      > "$fixture_worktree/packages/$key/package.json" || return 1
+    printf '{"versionFile":"packages/%s/VERSION","packageJson":"packages/%s/package.json","tagPrefix":"%s/v"}\n' "$key" "$key" "$key" \
+      > "$fixture_worktree/.bumpster/packages/$key.json" || return 1
+  done
+  printf '{"version":"0.8.0"}\n' > "$fixture_worktree/package.json" || return 1
+  git -C "$fixture_worktree" add . || return 1
+  git -C "$fixture_worktree" commit -q -m "Add package fixture" || return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+  git -C "$fixture_worktree" checkout -q main || return 1
+  git -C "$fixture_worktree" merge -q --ff-only dev || return 1
+  git -C "$fixture_worktree" push -q origin main || return 1
+  git -C "$fixture_worktree" checkout -q dev
+}
+
+assert_package_release() {
+  local version="$1"
+  assert_equal 0 "$cli_status" "$cli_output" || return 1
+  assert_equal dev "$(git -C "$fixture_worktree" branch --show-current)" || return 1
+  local ref
+  for ref in dev main "ui/v$version"; do
+    assert_equal "$version" "$(git --git-dir="$fixture_origin" show "$ref:packages/ui/VERSION")" || return 1
+    assert_equal 0.8.0 "$(git --git-dir="$fixture_origin" show "$ref:VERSION")" || return 1
+    assert_equal 0.1.0 "$(git --git-dir="$fixture_origin" show "$ref:packages/brand/VERSION")" || return 1
+    assert_equal 0.1.0 "$(git --git-dir="$fixture_origin" show "$ref:packages/contracts/VERSION")" || return 1
+  done
+  assert_equal "" "$(git -C "$fixture_worktree" status --porcelain)" || return 1
+  assert_equal 'packages/ui/VERSION
+packages/ui/package.json' "$(git -C "$fixture_worktree" diff-tree --no-commit-id --name-only -r "ui/v$version")" || return 1
+  assert_contains "$(cat "$fixture_worktree/packages/ui/package.json")" "\"version\":\"$version\"" || return 1
+  assert_contains "$(cat "$fixture_worktree/packages/ui/package.json")" '"@berem/contracts":"0.1.0"'
+}
+
+test_package_release() {
+  create_package_fixture package-release || return 1
+  run_bumpster --package ui --status
+  assert_equal 0 "$cli_status" "$cli_output" || return 1
+  assert_contains "$cli_output" "Package 'ui'" || return 1
+  run_bumpster --patch --package ui
+  assert_package_release 0.1.1 || return 1
+  run_bumpster --package ui --patch
+  assert_package_release 0.1.2 || return 1
+  run_bumpster --package ui --minor
+  assert_package_release 0.2.0 || return 1
+  run_bumpster --package ui --major
+  assert_package_release 1.0.0
+}
+
+test_package_hotfix() {
+  create_package_fixture package-hotfix || return 1
+  printf 'unfinished' > "$fixture_worktree/development.txt"
+  git -C "$fixture_worktree" add development.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Add development work" || return 1
+  git -C "$fixture_worktree" push -q origin dev || return 1
+  git -C "$fixture_worktree" checkout -q -b hotfix/ui main || return 1
+  printf 'fix' > "$fixture_worktree/fix.txt"
+  git -C "$fixture_worktree" add fix.txt || return 1
+  git -C "$fixture_worktree" commit -q -m "Fix UI" || return 1
+  run_bumpster --package ui --hotfix
+  assert_package_release 0.1.1 || return 1
+  [[ -f "$fixture_worktree/development.txt" ]] || return 1
+  if git --git-dir="$fixture_origin" cat-file -e ui/v0.1.1:development.txt 2>/dev/null; then
+    fail "Hotfix published unfinished development"
+  fi
+}
+
+test_package_rejections() {
+  local scenario initial_head initial_refs expected_tags
+  for scenario in local-tag remote-tag hook dirty-hook committed-hook mismatch traversal absolute symlink hardlink directory-link root overlap duplicate-prefix prefix unknown missing untracked; do
+    create_package_fixture "package-$scenario" || return 1
+    case "$scenario" in
+      local-tag | remote-tag)
+        git -C "$fixture_worktree" tag ui/v0.1.1 || return 1
+        if [[ "$scenario" == remote-tag ]]; then
+          git -C "$fixture_worktree" push -q origin ui/v0.1.1 || return 1
+          git -C "$fixture_worktree" tag -d ui/v0.1.1 >/dev/null || return 1
+        fi ;;
+      hook | dirty-hook | committed-hook)
+        mkdir -p "$fixture_worktree/.bumpster/hooks"
+        case "$scenario" in
+          hook) printf '#!/bin/bash\nexit 1\n' > "$fixture_worktree/.bumpster/hooks/pre-bump" ;;
+          dirty-hook) printf '#!/bin/bash\nprintf changed > packages/ui/VERSION\n' > "$fixture_worktree/.bumpster/hooks/pre-bump" ;;
+          committed-hook) printf '#!/bin/bash\nprintf changed > README.md\ngit add README.md\ngit commit -qm hook\n' > "$fixture_worktree/.bumpster/hooks/pre-bump" ;;
+        esac
+        chmod +x "$fixture_worktree/.bumpster/hooks/pre-bump" ;;
+      mismatch) printf '{"version":"9.0.0"}' > "$fixture_worktree/packages/ui/package.json" ;;
+      traversal) printf '{"versionFile":"../VERSION","packageJson":"packages/ui/package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
+      absolute) printf '{"versionFile":"/tmp/VERSION","packageJson":"packages/ui/package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
+      symlink) rm "$fixture_worktree/packages/ui/VERSION"; ln -s ../../VERSION "$fixture_worktree/packages/ui/VERSION" ;;
+      hardlink) rm "$fixture_worktree/packages/ui/VERSION"; ln "$fixture_worktree/VERSION" "$fixture_worktree/packages/ui/VERSION" ;;
+      directory-link) mv "$fixture_worktree/packages/ui" "$fixture_root/external-ui"; ln -s "$fixture_root/external-ui" "$fixture_worktree/packages/ui" ;;
+      root) printf '{"versionFile":"VERSION","packageJson":"package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
+      overlap) cp "$fixture_worktree/.bumpster/packages/ui.json" "$fixture_worktree/.bumpster/packages/brand.json" ;;
+      duplicate-prefix) printf '{"versionFile":"packages/brand/VERSION","packageJson":"packages/brand/package.json","tagPrefix":"ui/v"}' > "$fixture_worktree/.bumpster/packages/brand.json" ;;
+      prefix) printf '{"versionFile":"packages/ui/VERSION","packageJson":"packages/ui/package.json","tagPrefix":"v"}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
+      unknown) printf '{"versionFile":"packages/ui/VERSION","packageJson":"packages/ui/package.json","tagPrefix":"ui/v","all":true}' > "$fixture_worktree/.bumpster/packages/ui.json" ;;
+      missing) rm "$fixture_worktree/packages/ui/VERSION" ;;
+      untracked) git -C "$fixture_worktree" rm --cached -q .bumpster/packages/ui.json ;;
+    esac
+    git -C "$fixture_worktree" add . || return 1
+    if [[ "$scenario" == untracked ]]; then
+      git -C "$fixture_worktree" rm --cached -q .bumpster/packages/ui.json || return 1
+    fi
+    git -C "$fixture_worktree" diff --cached --quiet || git -C "$fixture_worktree" commit -q -m "Set rejection case" || return 1
+    initial_head="$(git -C "$fixture_worktree" rev-parse HEAD)"
+    initial_refs="$(git --git-dir="$fixture_origin" show-ref)"
+    expected_tags="$(git -C "$fixture_worktree" tag --list)"
+    run_bumpster --package ui --patch
+    [[ "$cli_status" != 0 ]] || { fail "Accepted $scenario: $cli_output"; return 1; }
+    assert_equal "$initial_refs" "$(git --git-dir="$fixture_origin" show-ref)" "$scenario changed origin" || return 1
+    assert_equal "$expected_tags" "$(git -C "$fixture_worktree" tag --list)" || return 1
+    assert_equal 0.8.0 "$(cat "$fixture_worktree/VERSION")" || return 1
+    if [[ "$scenario" != committed-hook ]]; then
+      assert_equal "$initial_head" "$(git -C "$fixture_worktree" rev-parse HEAD)" "$scenario changed HEAD" || return 1
+    fi
+  done
+}
+
+test_package_atomic_rejection() {
+  create_package_fixture package-atomic || return 1
+  local before
+  before="$(git --git-dir="$fixture_origin" show-ref)"
+  cat > "$fixture_origin/hooks/update" <<'HOOK'
+#!/bin/bash
+[[ "$1" != refs/heads/main ]]
+HOOK
+  chmod +x "$fixture_origin/hooks/update" || return 1
+  run_bumpster --package ui --patch
+  [[ "$cli_status" != 0 ]] || return 1
+  assert_equal "$before" "$(git --git-dir="$fixture_origin" show-ref)" || return 1
+  assert_contains "$cli_output" "refs/tags/ui/v0.1.1" || return 1
+  assert_contains "$cli_output" "git push --atomic" || return 1
+  assert_equal 0.8.0 "$(cat "$fixture_worktree/VERSION")"
+}
+
+test_package_hook_context() {
+  create_package_fixture package-hooks || return 1
+  mkdir -p "$fixture_worktree/.bumpster/hooks"
+  cat > "$fixture_worktree/.bumpster/hooks/pre-bump" <<'HOOK'
+#!/bin/bash
+[[ "$BUMPSTER_PACKAGE" == ui && "$BUMPSTER_VERSION_FILE" == packages/ui/VERSION &&
+   "$BUMPSTER_PACKAGE_JSON" == packages/ui/package.json && "$BUMPSTER_TAG" == ui/v0.1.1 &&
+   "$BUMPSTER_PREV_VERSION" == 0.1.0 && "$BUMPSTER_NEW_VERSION" == 0.1.1 ]]
+HOOK
+  printf '#!/bin/bash\nexit 1\n' > "$fixture_worktree/.bumpster/hooks/post-bump"
+  chmod +x "$fixture_worktree/.bumpster/hooks/"* || return 1
+  git -C "$fixture_worktree" add . || return 1
+  git -C "$fixture_worktree" commit -q -m "Add fixture hooks" || return 1
+  run_bumpster --package ui --patch
+  [[ "$cli_status" != 0 ]] || return 1
+  assert_contains "$cli_output" "The release was published before this later step failed." || return 1
+  assert_equal 0.1.1 "$(git --git-dir="$fixture_origin" show ui/v0.1.1:packages/ui/VERSION)" || return 1
+  assert_equal dev "$(git -C "$fixture_worktree" branch --show-current)"
+}
+
+test_package_custom_paths_without_config() {
+  create_package_fixture package-custom-paths || return 1
+  mkdir -p "$fixture_worktree/shared components" || return 1
+  mv "$fixture_worktree/packages/ui" "$fixture_worktree/shared components/ui" || return 1
+  mv "$fixture_worktree/shared components/ui/VERSION" "$fixture_worktree/shared components/ui/version.txt" || return 1
+  printf '{"versionFile":"shared components/ui/version.txt","packageJson":"shared components/ui/package.json","tagPrefix":"shared/ui/v"}' \
+    > "$fixture_worktree/.bumpster/packages/ui.json" || return 1
+  git -C "$fixture_worktree" rm -q .bumpsterrc || return 1
+  git -C "$fixture_worktree" add -A || return 1
+  git -C "$fixture_worktree" commit -q -m "Use custom package paths" || return 1
+  local before
+  before="$(git -C "$fixture_worktree" rev-parse HEAD)"
+  run_bumpster --package ui --patch
+  assert_equal 0 "$cli_status" "$cli_output" || return 1
+  assert_equal 0.1.1 "$(git --git-dir="$fixture_origin" show 'shared/ui/v0.1.1:shared components/ui/version.txt')" || return 1
+  assert_equal dev "$(git -C "$fixture_worktree" branch --show-current)" || return 1
+  assert_equal 0.8.0 "$(cat "$fixture_worktree/VERSION")" || return 1
+  assert_equal 'shared components/ui/package.json
+shared components/ui/version.txt' "$(git -C "$fixture_worktree" diff --name-only "$before" HEAD)" || return 1
+  [[ ! -e "$fixture_home/.bumpsterrc" ]] || fail "Package release created global config"
+}
+
+test_package_parser() {
+  create_package_fixture package-parser || return 1
+  local args
+  for args in '--package' '--package ../ui --patch' '--package ui --package brand --patch' '--package ui --update' '--package ui --create-hotfix' '--package missing --patch'; do
+    # Intentional splitting of static invalid argument fixtures.
+    # shellcheck disable=SC2086
+    run_bumpster $args
+    [[ "$cli_status" != 0 ]] || { fail "Accepted $args"; return 1; }
+  done
+  local before
+  before="$(git -C "$fixture_worktree" rev-parse HEAD)"
+  run_bumpster --patch
+  assert_successful_release 0.8.1 || return 1
+  assert_equal 0.1.0 "$(cat "$fixture_worktree/packages/ui/VERSION")" || return 1
+  assert_equal 'VERSION' "$(git -C "$fixture_worktree" diff --name-only "$before" HEAD)"
+}
+
 main() {
   local node_binary=""
 
@@ -2228,6 +2429,13 @@ main() {
   suite_root="$(mktemp -d "${TMPDIR:-/tmp}/bumpster-tests.XXXXXX")" ||
     fail "Could not create the test directory" || return 1
 
+  run_test "selected package releases preserve neighboring versions and dependencies" test_package_release
+  run_test "package hotfix preserves unpublished development and returns to dev" test_package_hotfix
+  run_test "package preflight rejects unsafe profiles, tags and hooks" test_package_rejections
+  run_test "package publication rejection preserves all remote refs atomically" test_package_atomic_rejection
+  run_test "package hooks receive target context and report published failures" test_package_hook_context
+  run_test "package paths with spaces and custom version files work without branch config" test_package_custom_paths_without_config
+  run_test "package CLI requires one explicit supported target; default flow is preserved" test_package_parser
   run_test "fixture uses an isolated local bare remote" test_fixture_uses_local_bare_remote
   run_test "runtime archive is reproducible, minimal and executable" test_runtime_archive_is_reproducible_and_minimal
   run_test "CLI delegates release execution to the release functions" test_cli_delegates_release_execution
