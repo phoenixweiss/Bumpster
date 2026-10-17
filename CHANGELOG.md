@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-18
+
 ### Changed
 
 - Release preflight now requires a confirmed origin tag in the selected product's
@@ -410,7 +412,9 @@ standalone Bumpster runtime asset.
 - Removed duplicated feature-branch deletion checks and improved related error
   handling.
 
-[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.3...HEAD
+[Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.0...v1.2.1
