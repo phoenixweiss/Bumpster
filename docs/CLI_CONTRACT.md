@@ -235,7 +235,9 @@ Both files and all profiles must be tracked regular files with normalized
 repository-relative paths. Absolute paths, `.`/`..` components, `.git`, backslashes,
 newlines, hard links, and symlinks in any path component are rejected. The version
 file and `package.json` must be distinct files in the same directory below the
-repository root. The manifest version must equal the bare `MAJOR.MINOR.PATCH` version file.
+repository root. The manifest version must equal the bare `MAJOR.MINOR.PATCH` version file for
+automatic release selection and successful status. Explicit source selection can
+reconcile different valid versions; see [Canonical release version](#canonical-release-version).
 All profiles are checked for overlapping files and duplicate tag prefixes. A
 prefix must be a valid Git tag namespace ending in `/v`, such as `ui/v` or
 `shared/ui/v`. An invalid profile blocks package mode even when another package
@@ -261,6 +263,78 @@ reviewed change, run their checks, and release each affected consumer with its
 own package selection. A separate CI publisher should select one package from
 its tag namespace and verify its manifest version before publishing it.
 
-Without `--package`, the existing current-directory `VERSION`, optional root
-`package.json` synchronization, `vX.Y.Z` tags, and single-product flow remain
-unchanged. Package profiles never select a target implicitly.
+Without `--package`, the current-directory `VERSION`, optional root `package.json`,
+and `vX.Y.Z` tags select the ordinary product. The canonical-version policy
+also applies to this flow. Package profiles never select a target implicitly.
+
+## Canonical release version
+
+Without a configuration file, releases use the default branches without creating
+configuration. Use `--create-local-config` to create it explicitly.
+
+This strict release policy changes the previous file-only behavior. The initial
+release of each product requires an explicit source. Existing releases require a
+confirmed tag; matching files alone are not sufficient.
+
+`--version-source SOURCE` is a release-only modifier. It accepts `version-file`,
+`package-json`, or `tag:NAME`, exactly once. The selected value is the **base** for
+the requested bump, not the final version:
+
+```sh
+bumpster --patch --version-source tag:v1.3.0
+bumpster --package website --patch --version-source tag:website/v0.0.1
+bumpster --package new-package --patch --version-source version-file
+```
+
+Without `--package`, only exact stable `vMAJOR.MINOR.PATCH` tags participate.
+Packages use only their profile's exact `tagPrefix` followed by stable SemVer.
+Other products, prerelease tags, dependency ranges, and lockfiles do not supply
+versions. The root manifest participates only when `SYNC_WITH_PACKAGE_JSON` is
+true; a selected package's manifest always participates. Participating files must
+be tracked regular files without symlink components or hard links. Node.js is
+needed only for package profiles or participating JSON manifests.
+
+Release preflight queries `origin` and checks its configured release branch.
+Local matching tags must agree with the published tag objects. Unpublished
+matching local tags stop the release for manual partial-release recovery. A
+missing local copy of a published tag is allowed; its object is fetched without
+creating or moving local tags. Annotated and legacy lightweight tags are accepted.
+
+The confirmed tag is the unique latest tag by Git ancestry, not creation time,
+lexical order, or a repository-wide latest release. It may be behind branch HEAD
+after another product's release. All matching published tags must be ancestors
+of the origin release branch and versions must increase along ancestry. Shallow
+history, incomparable tag lines, multiple versions at one commit, decreasing
+versions, missing release history, or conflicting local tags are hard failures.
+An override cannot bypass them.
+
+The confirmed tag must match its version file and participating manifest at its
+own commit. A legacy root tag without a manifest is allowed when synchronization
+is enabled later; a package tag requires both historical files. Missing historical
+paths after a profile/path migration require manual migration planning. An invalid
+latest tag never silently falls back to an older release.
+
+When all participating files equal the confirmed version, it supplies the base
+automatically. Any disagreement, including agreeing files ahead of the tag,
+requires explicit source selection. `tag:NAME` must name the confirmed tag of the
+selected product. `package-json` requires a participating manifest with a stable
+version. An absent JSON `version` field can be filled only with an explicit base
+from another source. Invalid JSON, non-string/invalid versions, or missing files
+cannot be repaired by an override. If the selected namespace has no published or
+local stable tags, an explicit file source bootstraps its first release. The new
+version must exceed the last confirmed release and the selected base.
+
+Preflight displays the files, participation, confirmed tag/commit, chosen base,
+and release plan. `--status` reports files and local-cache-only tag information
+without fetching; mismatching participating values return nonzero. `--version`
+continues to report the installed Bumpster runtime version.
+
+Before the first write, both CLI and package flows reject pre-bump changes to
+HEAD, branch, inputs, configuration, or selected origin release refs. The hook's
+`BUMPSTER_PREV_VERSION` is the selected base. All final bytes are prepared before
+replacement, permissions are preserved, and one bump commit contains the final
+versions. Unexpected staging outside the selected files stops before commit and
+is preserved. A failed replacement restores only operation-owned writes; concurrent
+edits are preserved and backup paths are reported. This is not a filesystem-wide
+atomic transaction. Git publication remains atomic. Hotfix topology and branch
+version checks still apply, and published refs are never rolled back automatically.

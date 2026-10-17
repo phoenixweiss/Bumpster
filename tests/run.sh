@@ -13,6 +13,7 @@ cli_status=0
 test_path="$PATH"
 passed=0
 failed=0
+fixture_initial_tags=""
 sha256_command=""
 
 cleanup() {
@@ -124,6 +125,12 @@ create_fixture() {
   git -C "$fixture_worktree" add VERSION README.md .bumpsterrc || return 1
   git -C "$fixture_worktree" commit -q -m "Initialize fixture" || return 1
   git -C "$fixture_worktree" remote add origin "$fixture_origin" || return 1
+  fixture_initial_tags=""
+  if [[ "$initial_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    git -C "$fixture_worktree" tag -a "v$initial_version" -m "Fixture baseline" || return 1
+    git -C "$fixture_worktree" push -q origin "refs/tags/v$initial_version" || return 1
+    fixture_initial_tags="v$initial_version"
+  fi
   git -C "$fixture_worktree" push -q -u origin main || return 1
   git -C "$fixture_worktree" checkout -q -b dev || return 1
   git -C "$fixture_worktree" push -q -u origin dev || return 1
@@ -228,7 +235,8 @@ enable_package_sync() {
 assert_release_state_unchanged() {
   local expected_head="$1"
   local expected_version="$2"
-  local expected_tags="${3:-}"
+  local expected_tags
+  expected_tags="$(printf '%s\n' "$fixture_initial_tags" "${3:-}" | sed '/^$/d' | sort -u)"
   local actual_head
   local actual_version
   local tags
@@ -1469,7 +1477,7 @@ test_package_sync_adds_missing_root_version() {
   git -C "$fixture_worktree" commit -q -m "Add versionless fixture package" ||
     return 1
 
-  run_bumpster --patch
+  run_bumpster --patch --version-source version-file
 
   assert_successful_release "0.8.1" || return 1
   package_values="$(
@@ -2006,7 +2014,7 @@ test_existing_release_tag_is_rejected_without_mutation() {
   run_bumpster --patch
 
   [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded with an existing tag" || return 1
-  assert_contains "$cli_output" "Release tag 'v0.8.1' already exists" \
+  assert_contains "$cli_output" "Multiple release versions point to one commit" \
     "Existing tag error is missing" || return 1
   assert_release_state_unchanged "$initial_head" "0.8.0" "v0.8.1"
 }
@@ -2089,7 +2097,8 @@ test_missing_remote_main_is_created_by_release() {
   git --git-dir="$fixture_origin" update-ref -d refs/heads/main || return 1
   git -C "$fixture_worktree" update-ref -d refs/remotes/origin/main || return 1
 
-  run_bumpster --patch
+  remove_fixture_tag v0.8.0 || return 1
+  run_bumpster --patch --version-source version-file
 
   assert_successful_release "0.8.1"
 }
@@ -2100,7 +2109,8 @@ test_missing_local_and_remote_main_is_created_by_release() {
   git --git-dir="$fixture_origin" update-ref -d refs/heads/main || return 1
   git -C "$fixture_worktree" update-ref -d refs/remotes/origin/main || return 1
 
-  run_bumpster --patch
+  remove_fixture_tag v0.8.0 || return 1
+  run_bumpster --patch --version-source version-file
 
   assert_successful_release "0.8.1"
 }
@@ -2127,7 +2137,7 @@ test_remote_only_release_tag_is_rejected_without_mutation() {
   run_bumpster --patch
 
   [[ "$cli_status" -ne 0 ]] || fail "Release unexpectedly succeeded with a remote-only tag" || return 1
-  assert_contains "$cli_output" "Release tag 'v0.8.1' already exists on origin" \
+  assert_contains "$cli_output" "Multiple release versions point to one commit" \
     "Remote-only tag error is missing" || return 1
   assert_release_state_unchanged "$initial_head" "0.8.0"
 }
@@ -2224,6 +2234,11 @@ create_package_fixture() {
   git -C "$fixture_worktree" checkout -q main || return 1
   git -C "$fixture_worktree" merge -q --ff-only dev || return 1
   git -C "$fixture_worktree" push -q origin main || return 1
+  for key in ui brand contracts; do
+    git -C "$fixture_worktree" tag -a "$key/v0.1.0" -m "Fixture package baseline" || return 1
+    git -C "$fixture_worktree" push -q origin "refs/tags/$key/v0.1.0" || return 1
+  done
+  fixture_initial_tags="$(git -C "$fixture_worktree" tag --list)"
   git -C "$fixture_worktree" checkout -q dev
 }
 
@@ -2392,7 +2407,7 @@ test_package_custom_paths_without_config() {
   git -C "$fixture_worktree" commit -q -m "Use custom package paths" || return 1
   local before
   before="$(git -C "$fixture_worktree" rev-parse HEAD)"
-  run_bumpster --package ui --patch
+  run_bumpster --package ui --patch --version-source version-file
   assert_equal 0 "$cli_status" "$cli_output" || return 1
   assert_equal 0.1.1 "$(git --git-dir="$fixture_origin" show 'shared/ui/v0.1.1:shared components/ui/version.txt')" || return 1
   assert_equal dev "$(git -C "$fixture_worktree" branch --show-current)" || return 1
@@ -2435,7 +2450,7 @@ test_repository_website_releases() {
   git -C "$fixture_worktree" push -q origin dev || return 1
   run_bumpster --package website --status
   assert_equal 0 "$cli_status" "$cli_output" || return 1
-  run_bumpster --package website --patch
+  run_bumpster --package website --patch --version-source version-file
   assert_equal 0 "$cli_status" "$cli_output" || return 1
   local next_website
   next_website="$(cat "$fixture_worktree/website/VERSION")" || return 1
@@ -2470,6 +2485,9 @@ test_repository_website_releases() {
   ) || { fail "Website redeployment or refusal checks failed"; return 1; }
 }
 
+# shellcheck source=tests/version-sources.sh
+source "$project_root/tests/version-sources.sh"
+
 main() {
   local node_binary=""
 
@@ -2493,6 +2511,7 @@ main() {
   suite_root="$(mktemp -d "${TMPDIR:-/tmp}/bumpster-tests.XXXXXX")" ||
     fail "Could not create the test directory" || return 1
 
+  run_version_source_tests
   run_test "repository CLI and website versions release independently; Pages validates website tags" test_repository_website_releases
   run_test "selected package releases preserve neighboring versions and dependencies" test_package_release
   run_test "package hotfix preserves unpublished development and returns to dev" test_package_hotfix

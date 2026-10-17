@@ -45,11 +45,21 @@ select_cli_command() {
 
 # Process command-line options
 selected_package=""
+version_source=""
 version_type=""
 selected_command=""
 selected_option=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --version-source)
+      [[ -z "$version_source" && $# -ge 2 ]] ||
+        abort "--version-source requires exactly one source."
+      case "$2" in
+        version-file | package-json | tag:?*) version_source="$2" ;;
+        *) abort "--version-source expects version-file, package-json, or tag:NAME." ;;
+      esac
+      shift
+      ;;
     --package)
       [[ -z "$selected_package" && $# -ge 2 && "$2" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] ||
         abort "--package requires one package key (letters, digits, underscore, hyphen)."
@@ -102,6 +112,13 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+if [[ -n "$version_source" ]]; then
+  case "$selected_command" in
+    "" | release) ;;
+    *) abort "--version-source is supported only for releases." ;;
+  esac
+fi
+
 if [[ -n "$selected_package" ]]; then
   case "$selected_command" in
     "" | release | status) ;;
@@ -137,7 +154,8 @@ esac
 case "$selected_command" in
   status)
     resolve_release_target
-    check_status
+    check_status || exit $?
+    report_version_sources
     exit $?
     ;;
   close-feature)
@@ -168,10 +186,7 @@ elif [ -f "$global_config_file" ]; then
 elif [[ -n "$selected_package" ]]; then
   log "No branch configuration found. Using default branches for the selected package."
 else
-  log "No configuration file found."
-  log "Running initial setup..."
-  interactive_setup ||
-    abort "Could not create global configuration file at '$global_config_file'."
+  log "No branch configuration found. Using default branches without creating configuration."
 fi
 
 resolve_release_target

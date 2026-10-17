@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Release preflight now requires a confirmed origin tag in the selected product's
+  namespace or an explicit initial file source. `--version-source` selects a base
+  for reconciliation; conflicting sources and unsafe or ambiguous history stop
+  before writes. CLI/package namespaces remain independent. This strict policy
+  changes the earlier file-only release contract.
+- Recheck CLI and package inputs and origin refs after pre-bump hooks. Prepare all
+  version files before replacement and preserve backups if concurrent edits prevent
+  safe restoration after a write failure.
+
 ## [1.3.0] - 2026-10-13
 
 ### Added

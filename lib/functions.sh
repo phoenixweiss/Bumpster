@@ -129,6 +129,7 @@ run_hook() {
 
 # Resolve exactly one tracked package profile; never evaluate profile data as code.
 resolve_release_target() {
+  sync_with_package_json="${sync_with_package_json:-false}"
   release_version_file="VERSION"
   release_package_json="package.json"
   release_tag_prefix="v"
@@ -185,12 +186,6 @@ try {
     prefixes.add(data.tagPrefix);
     if (name === `${process.argv[2]}.json`) selected = data;
   }
-  const version = fs.readFileSync(selected.versionFile,"utf8").replace(/\n+$/, "");
-  if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version))
-    throw new Error("version file must contain MAJOR.MINOR.PATCH");
-  const manifest = JSON.parse(fs.readFileSync(selected.packageJson,"utf8"));
-  if (!manifest || Array.isArray(manifest) || manifest.version !== version)
-    throw new Error("selected manifest version must match the version file");
   console.log(selected.versionFile); console.log(selected.packageJson); console.log(selected.tagPrefix);
 } catch (error) {
   console.error(`Invalid package target: ${error.message}`); process.exit(1);
@@ -1010,6 +1005,7 @@ Usage:  bumpster [action]
         Choose only one action per invocation.
 
         --package KEY               Select .bumpster/packages/KEY.json for release/status
+        --version-source SOURCE     Resolve release versions from version-file, package-json, tag:NAME
         -h, --help                   Show this help message
         -M, --major                  Bump major version
         -m, --minor                  Bump minor version
@@ -1257,14 +1253,14 @@ preflight_release() {
   )"
   remote_tag_sha="$(remote_ref_sha "$remote_refs" "refs/tags/$release_tag")"
 
-  if [[ -n "$remote_tag_sha" ]]; then
+  if [[ -n "$new_version" && -n "$remote_tag_sha" ]]; then
     abort "Release tag '$release_tag' already exists on origin."
   fi
-  if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+  if [[ -n "$new_version" ]] && git show-ref --verify --quiet "refs/tags/$release_tag"; then
     abort "Release tag '$release_tag' already exists locally."
   fi
 
-  git fetch --prune origin ||
+  git fetch --prune --no-tags origin ||
     abort "Failed to fetch current state from origin. Check its URL, access, and fetch configuration."
 
   if [[ -n "$remote_develop_sha" ]] &&
@@ -1304,6 +1300,238 @@ preflight_release() {
   release_initial_remote_master_sha="${remote_master_sha:-absent}"
 
   log "Release preflight checks passed."
+}
+
+# Compare stable SemVer components without overflowing Bash integer arithmetic.
+version_is_greater() {
+  local left_a left_b left_c right_a right_b right_c left right index
+  IFS=. read -r left_a left_b left_c <<< "$1"
+  IFS=. read -r right_a right_b right_c <<< "$2"
+  for index in 1 2 3; do
+    case "$index" in
+      1) left="$left_a"; right="$right_a" ;;
+      2) left="$left_b"; right="$right_b" ;;
+      3) left="$left_c"; right="$right_c" ;;
+    esac
+    [[ ${#left} -gt ${#right} ]] && return 0
+    [[ ${#left} -lt ${#right} ]] && return 1
+    [[ "$left" > "$right" ]] && return 0
+    [[ "$left" < "$right" ]] && return 1
+  done
+  return 1
+}
+
+is_stable_version() {
+  [[ "$1" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+}
+
+# Validate the writable target even when a different source supplies its version.
+validate_version_path() {
+  local file="$1" component current="." links
+  local components=()
+  [[ "$file" != /* && "$file" != *\\* && "$file" != *$'\n'* && "$file" != *$'\r'* ]] ||
+    abort "Unsafe version path: $file"
+  IFS=/ read -r -a components <<< "$file"
+  for component in "${components[@]}"; do
+    [[ -n "$component" && "$component" != . && "$component" != .. && "$component" != .git ]] ||
+      abort "Unsafe version path: $file"
+    current="$current/$component"
+    [[ ! -L "$current" ]] || abort "Version path contains a symlink: $file"
+  done
+  [[ -f "$file" ]] || abort "VERSION file not found. Required version path: $file"
+  links="$(stat -c %h "$file" 2>/dev/null || stat -f %l "$file" 2>/dev/null)" ||
+    abort "Could not inspect version file links: $file"
+  [[ "$links" == 1 ]] || abort "Version path must not be a hard link: $file"
+  git --literal-pathspecs ls-files --error-unmatch -- "$file" >/dev/null 2>&1 ||
+    abort "Version path must be tracked: $file"
+}
+
+# Parse JSON with Node.js; missing version is repairable only by explicit choice.
+read_manifest_version() {
+  # shellcheck disable=SC2016
+  node -e '
+const fs = require("fs");
+try {
+  const text = process.argv[1] === "-" ? fs.readFileSync(0,"utf8") : fs.readFileSync(process.argv[1],"utf8");
+  const data = JSON.parse(text);
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("root must be an object");
+  if (!Object.prototype.hasOwnProperty.call(data,"version")) { console.log("missing"); process.exit(0); }
+  if (typeof data.version !== "string" || !/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(data.version))
+    throw new Error("version must be a MAJOR.MINOR.PATCH string");
+  console.log(data.version);
+} catch (error) { console.error(`Invalid package.json: ${error.message}`); process.exit(1); }
+' "$1"
+}
+
+read_version_sources() {
+  validate_version_path "$release_version_file"
+  release_file_version="$(cat "$release_version_file")" || abort "Failed to read VERSION."
+  is_stable_version "$release_file_version" ||
+    abort "VERSION must contain MAJOR.MINOR.PATCH with no prefix, suffix, or leading zeros."
+  release_manifest_version="not participating"
+  log "Version source $release_version_file: $release_file_version"
+  if [[ "$sync_with_package_json" == true ]]; then
+    validate_version_path "$release_package_json"
+    validate_package_json_for_sync "$release_package_json" || abort "package.json cannot be synchronized safely."
+    release_manifest_version="$(read_manifest_version "$release_package_json")" ||
+      abort "package.json cannot be synchronized safely."
+    log "Version source $release_package_json: $release_manifest_version"
+  else
+    log "Version source $release_package_json: not participating (synchronization disabled)."
+  fi
+}
+
+report_version_sources() {
+  read_version_sources
+  log "Tag namespace: ${release_tag_prefix}MAJOR.MINOR.PATCH (local cache only; not verified against origin)."
+  if [[ "$sync_with_package_json" == true && "$release_manifest_version" != "$release_file_version" ]]; then
+    log "Version sources disagree; release requires an explicit --version-source." "ERROR"
+    return 1
+  fi
+}
+
+# Include selected source/configuration bytes, including files hidden by index flags.
+version_plan_snapshot() {
+  local file
+  printf '%s\n' "$release_version_file|$release_package_json|$release_tag_prefix|$sync_with_package_json"
+  for file in "$release_version_file" "$local_config_file" "$global_config_file"; do
+    if [[ -f "$file" ]]; then git hash-object --no-filters -- "$file" || return 1; else printf 'absent\n'; fi
+  done
+  if [[ "$sync_with_package_json" == true ]]; then
+    git hash-object --no-filters -- "$release_package_json" || return 1
+  fi
+  if [[ -n "${selected_package:-}" ]]; then
+    git hash-object --no-filters -- ".bumpster/packages/$selected_package.json" || return 1
+  fi
+}
+
+# Query exact namespace refs, never use dates, global latest, or lexical ordering.
+query_version_tags() {
+  local listing oid ref name value
+  listing="$(git ls-remote --tags origin)" || abort "Failed to query version tags from origin."
+  while IFS=$'\t' read -r oid ref; do
+    [[ -n "$ref" ]] || continue
+    name="${ref#refs/tags/}"
+    name="${name%\^\{\}}"
+    [[ "$name" == "$release_tag_prefix"* ]] || continue
+    value="${name#"$release_tag_prefix"}"
+    is_stable_version "$value" || continue
+    printf '%s\t%s\n' "$oid" "$ref"
+  done <<< "$listing"
+}
+
+assert_version_tags_unchanged() {
+  local actual
+  actual="$(query_version_tags)" || abort "Could not recheck published tags."
+  [[ "$actual" == "$release_version_tags_snapshot" ]] || abort "Published version tags changed after the release plan."
+}
+
+validate_historical_version_file() {
+  local entry mode
+  entry="$(git -C "$(git rev-parse --show-toplevel)" --literal-pathspecs ls-tree "$1" -- "$2")" ||
+    abort "Could not inspect a confirmed version file."
+  mode="${entry%% *}"
+  case "$mode" in
+    100644 | 100755) ;;
+    *) abort "Confirmed version paths must be regular Git files: $2" ;;
+  esac
+}
+
+resolve_canonical_version() {
+  local oid ref tag value local_oid commit release_ref local_tags i j latest=-1 maxima=0
+  local names=() versions=() commits=() count=0 dominated historical manifest_path version_path
+  local remote_tags
+  remote_tags="$(query_version_tags)" || abort "Could not inspect published version tags."
+  release_version_tags_snapshot="$remote_tags"
+  local_tags="$(git for-each-ref --format='%(objectname) %(refname)' refs/tags)" ||
+    abort "Could not inspect local version tags."
+  while read -r local_oid ref; do
+    [[ -n "$ref" ]] || continue
+    tag="${ref#refs/tags/}"
+    [[ "$tag" == "$release_tag_prefix"* ]] || continue
+    is_stable_version "${tag#"$release_tag_prefix"}" || continue
+    oid="$(remote_ref_sha "$remote_tags" "$ref")"
+    [[ -n "$oid" ]] || abort "Unpublished local release tag '$tag'; inspect partial release recovery."
+    [[ "$oid" == "$local_oid" ]] || abort "Local and origin tag '$tag' disagree."
+  done <<< "$local_tags"
+  release_ref="refs/remotes/origin/$release_master_branch"
+  while IFS=$'\t' read -r oid ref; do
+    [[ -n "$ref" && "$ref" != *'^{}' ]] || continue
+    tag="${ref#refs/tags/}"
+    value="${tag#"$release_tag_prefix"}"
+    if ! git cat-file -e "$oid^{commit}" 2>/dev/null; then
+      git fetch --quiet --no-tags origin "$oid" || abort "Could not fetch published tag '$tag'."
+    fi
+    commit="$(git rev-parse --verify "$oid^{commit}")" || abort "Tag '$tag' does not point to a commit."
+    [[ "${release_initial_remote_master_sha:-absent}" != absent ]] ||
+      abort "Published tags exist but the origin release branch is missing."
+    git merge-base --is-ancestor "$commit" "$release_ref" ||
+      abort "Published tag '$tag' is outside the origin release branch history."
+    names[count]="$tag"; versions[count]="$value"; commits[count]="$commit"
+    count=$((count + 1))
+  done <<< "$remote_tags"
+  for ((i=0; i<count; i++)); do
+    dominated=false
+    for ((j=0; j<count; j++)); do
+      [[ "$i" != "$j" ]] || continue
+      [[ "${commits[$i]}" != "${commits[$j]}" ]] ||
+        abort "Multiple release versions point to one commit."
+      if git merge-base --is-ancestor "${commits[$i]}" "${commits[$j]}"; then
+        version_is_greater "${versions[$j]}" "${versions[$i]}" ||
+          abort "Release versions decrease along the published history."
+        dominated=true
+      fi
+    done
+    if [[ "$dominated" == false ]]; then latest="$i"; maxima=$((maxima + 1)); fi
+  done
+  [[ "$maxima" -le 1 ]] || abort "Published release history has incomparable tag lines."
+  release_confirmed_version=""
+  release_confirmed_tag=""
+  if [[ "$latest" -ge 0 ]]; then
+    release_confirmed_version="${versions[$latest]}"
+    release_confirmed_tag="${names[$latest]}"
+    version_path="$(git rev-parse --show-prefix)$release_version_file"
+    manifest_path="$(git rev-parse --show-prefix)$release_package_json"
+    validate_historical_version_file "${commits[$latest]}" "$version_path"
+    historical="$(git show "${commits[$latest]}:$version_path" 2>/dev/null)" ||
+      abort "Confirmed tag '$release_confirmed_tag' has no selected version file."
+    [[ "$historical" == "$release_confirmed_version" ]] ||
+      abort "Confirmed tag '$release_confirmed_tag' disagrees with its version file."
+    if [[ "$sync_with_package_json" == true ]]; then
+      # A legacy root tag may predate opting in to manifest synchronization.
+      if git cat-file -e "${commits[$latest]}:$manifest_path" 2>/dev/null; then
+        validate_historical_version_file "${commits[$latest]}" "$manifest_path"
+        historical="$(git show "${commits[$latest]}:$manifest_path" | read_manifest_version -)" ||
+          abort "Confirmed tag has an invalid manifest."
+        [[ "$historical" == "$release_confirmed_version" ]] || abort "Confirmed tag disagrees with its manifest."
+      elif [[ -n "${selected_package:-}" ]]; then
+        abort "Confirmed package tag has no selected manifest."
+      fi
+    fi
+    log "Confirmed source $release_confirmed_tag at ${commits[$latest]}: $release_confirmed_version"
+  else
+    log "No published release tag exists in the selected namespace."
+  fi
+  case "${version_source:-}" in
+    "")
+      [[ -n "$release_confirmed_version" ]] || abort "Initial release requires an explicit --version-source."
+      release_current_version="$release_confirmed_version"
+      [[ "$release_file_version" == "$release_current_version" &&
+         ( "$sync_with_package_json" != true || "$release_manifest_version" == "$release_current_version" ) ]] ||
+        abort "Version sources disagree with the confirmed tag; choose --version-source explicitly."
+      ;;
+    version-file) release_current_version="$release_file_version" ;;
+    package-json)
+      [[ "$sync_with_package_json" == true && "$release_manifest_version" != missing ]] ||
+        abort "package-json requires a participating manifest with a version."
+      release_current_version="$release_manifest_version" ;;
+    tag:*)
+      [[ -n "$release_confirmed_tag" && "${version_source#tag:}" == "$release_confirmed_tag" ]] ||
+        abort "--version-source tag must name the confirmed tag of the selected product."
+      release_current_version="$release_confirmed_version" ;;
+    *) abort "Unsupported version source." ;;
+  esac
+  log "Canonical base: $release_current_version (source: ${version_source:-confirmed tag})."
 }
 
 # Function to check if a branch exists locally or remotely, and create it if necessary
@@ -1423,7 +1651,7 @@ validate_hotfix_release() {
     abort "Could not read VERSION from '$release_master_branch'."
   develop_version="$(git show "$develop_ref:$release_version_file" 2>/dev/null)" ||
     abort "Could not read VERSION from '$release_develop_branch'."
-  if [[ "$release_current_version" != "$master_version" ]]; then
+  if [[ "$release_current_version" != "$master_version" || "$release_file_version" != "$master_version" ]]; then
     abort "Hotfix branch VERSION must match '$release_master_branch'."
   fi
   if [[ "$release_current_version" != "$develop_version" ]]; then
@@ -1441,6 +1669,8 @@ prepare_release_plan() {
   local worktree_status=""
 
   require_git_repository
+  [[ "$(git rev-parse --is-shallow-repository)" == false ]] ||
+    abort "Version selection requires complete history; shallow repositories are not supported."
   worktree_status="$(git status --porcelain)" ||
     abort "Could not inspect the working tree."
   if [[ -n "$worktree_status" ]]; then
@@ -1475,17 +1705,10 @@ prepare_release_plan() {
   export default_dev_branch
   export default_master_branch
 
-  if [[ ! -f "$release_version_file" ]]; then
-    abort "VERSION file not found. Create it with a semantic version such as 0.1.0 before releasing."
-  fi
-  release_current_version="$(cat "$release_version_file")" ||
-    abort "Failed to read the VERSION file."
-  if [[ ! "$release_current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-    abort "VERSION must contain MAJOR.MINOR.PATCH with no prefix, suffix, or leading zeros."
-  fi
-  log_highlighted \
-    "Current version is $release_current_version" \
-    "$release_current_version"
+  read_version_sources
+  preflight_release "" "$release_develop_branch" "$release_master_branch"
+  resolve_canonical_version
+  log_highlighted "Current version is $release_current_version" "$release_current_version"
 
   release_version_type="$requested_type"
   if [[ -z "$release_version_type" ]]; then
@@ -1515,6 +1738,13 @@ prepare_release_plan() {
   if [[ "$release_current_version" == "$release_new_version" ]]; then
     abort "New version is the same as the current version."
   fi
+  if ! is_stable_version "$release_new_version" || ! version_is_greater "$release_new_version" "$release_current_version"; then
+    abort "Semantic version increment overflowed or did not increase the base."
+  fi
+  if [[ -n "$release_confirmed_version" ]]; then
+    version_is_greater "$release_new_version" "$release_confirmed_version" ||
+      abort "New version must exceed the last confirmed version '$release_confirmed_version'."
+  fi
 
   release_after_branch="${after_bump_branch:-$release_develop_branch}"
   if ! git show-ref --verify --quiet "refs/heads/$release_after_branch"; then
@@ -1522,15 +1752,15 @@ prepare_release_plan() {
     release_after_branch="$release_develop_branch"
   fi
 
-  if [[ "${sync_with_package_json}" == "true" && -f "$release_package_json" ]]; then
-    validate_package_json_for_sync "$release_package_json" ||
-      abort "package.json cannot be synchronized safely."
+  # The branch snapshot was verified before resolving the base. Only the new
+  # tag needs a separate check here; full preflight runs again after the hook.
+  if git show-ref --verify --quiet "refs/tags/${release_tag_prefix}$release_new_version"; then
+    abort "Release tag '${release_tag_prefix}$release_new_version' already exists locally."
   fi
-
-  preflight_release \
-    "$release_new_version" \
-    "$release_develop_branch" \
-    "$release_master_branch"
+  if [[ -n "$(remote_ref_sha "$release_version_tags_snapshot" "refs/tags/${release_tag_prefix}$release_new_version")" ]]; then
+    abort "Release tag '${release_tag_prefix}$release_new_version' already exists on origin."
+  fi
+  assert_version_tags_unchanged
 
   if [[ "$release_is_hotfix" == "true" ]]; then
     validate_hotfix_release
@@ -1548,32 +1778,103 @@ prepare_release_plan() {
   log "Release branches: start '$release_start_branch', development '$release_develop_branch', release '$release_master_branch', return '$release_after_branch'."
 }
 
-# Function to update and stage files described by the prepared release plan
-stage_release_files() {
-  release_stage="updating VERSION"
-  printf '%s' "$release_new_version" > "$release_version_file" ||
-    abort "Failed to write version $release_new_version to VERSION."
-  git --literal-pathspecs add -- "$release_version_file" || abort "Failed to stage VERSION."
-
-  if [[ "${sync_with_package_json}" == "true" ]]; then
-    release_stage="synchronizing package.json"
-    if [[ -f "$release_package_json" ]]; then
-      log "Synchronizing version with $release_package_json."
-      update_package_json_version "$release_package_json" "$release_new_version" ||
-        abort "Failed to update $release_package_json version safely."
-      git --literal-pathspecs add -- "$release_package_json" || abort "Failed to stage package.json."
-      log_highlighted \
-        "Updated version in $release_package_json to $release_new_version." \
-        "$release_new_version"
-    else
-      log "package.json not found. Skipping synchronization."
+# Prepare all bytes before replacement; restore only our own writes on failure.
+stage_release_files() (
+  local directory stage_root="" complete=false preserve=false index_attempted=false file index=0 prefix
+  local files=("$release_version_file")
+  if [[ "$sync_with_package_json" == true ]]; then files+=("$release_package_json"); fi
+  directory="$(dirname "$release_version_file")"
+  stage_root="$(mktemp -d "$directory/.bumpster-release.XXXXXX")" || exit 1
+  # Invoked indirectly by EXIT/INT/TERM traps.
+  # shellcheck disable=SC2329
+  restore_release_files() {
+    local status=$? n original_entry current_entry mode oid expected_oid
+    trap - EXIT INT TERM
+    if [[ "$complete" != true ]]; then
+      # Undo only index entries that still contain exactly our staged bytes.
+      for ((n=0; n<${#files[@]}; n++)); do
+        [[ -f "$stage_root/index-$n" ]] || continue
+        original_entry="$(cat "$stage_root/index-$n")"
+        current_entry="$(git --literal-pathspecs ls-files --stage -- "${files[$n]}")" || { preserve=true; continue; }
+        [[ "$current_entry" != "$original_entry" ]] || continue
+        [[ "$index_attempted" == true ]] || { preserve=true; continue; }
+        [[ -f "$stage_root/expected-$n" ]] || { preserve=true; continue; }
+        mode="${original_entry%% *}"; oid="${original_entry#* }"; oid="${oid%% *}"
+        expected_oid="$(git hash-object --path="${files[$n]}" "$stage_root/expected-$n")" || { preserve=true; continue; }
+        if [[ "$current_entry" == "$mode $expected_oid "* ]]; then
+          git update-index --cacheinfo "$mode" "$oid" "${files[$n]}" || preserve=true
+        else
+          preserve=true
+        fi
+      done
+      for ((n=0; n<${#files[@]}; n++)); do
+        [[ -f "$stage_root/original-$n" ]] || continue
+        if cmp -s "${files[$n]}" "$stage_root/original-$n"; then continue; fi
+        if [[ -f "$stage_root/expected-$n" ]] && cmp -s "${files[$n]}" "$stage_root/expected-$n"; then
+          mv -f -- "$stage_root/original-$n" "${files[$n]}" || preserve=true
+        else
+          preserve=true
+        fi
+      done
     fi
+    if [[ "$preserve" == true ]]; then
+      log "Version file recovery needs inspection; backups preserved at '$stage_root'." "ERROR"
+    else
+      rm -rf -- "$stage_root" || log "Could not remove release staging directory '$stage_root'." "WARN"
+    fi
+    exit "$status"
+  }
+  trap restore_release_files EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  for file in "${files[@]}"; do
+    validate_version_path "$file"
+    git --literal-pathspecs ls-files --stage -- "$file" > "$stage_root/index-$index" || exit 1
+    cp -p -- "$file" "$stage_root/original-$index" || exit 1
+    cp -p -- "$file" "$stage_root/next-$index" || exit 1
+    index=$((index + 1))
+  done
+  printf '%s' "$release_new_version" > "$stage_root/next-0" || exit 1
+  if [[ "$sync_with_package_json" == true ]]; then
+    update_package_json_version "$stage_root/next-1" "$release_new_version" || exit 1
+    [[ "$(read_manifest_version "$stage_root/next-1")" == "$release_new_version" ]] || exit 1
   fi
-}
+  for ((index=0; index<${#files[@]}; index++)); do
+    cp -p -- "$stage_root/next-$index" "$stage_root/expected-$index" || exit 1
+  done
+  # Concurrent source edits must not be overwritten, even with index skip flags.
+  for ((index=0; index<${#files[@]}; index++)); do
+    cmp -s "${files[$index]}" "$stage_root/original-$index" || exit 1
+  done
+  for ((index=0; index<${#files[@]}; index++)); do
+    mv -f -- "$stage_root/next-$index" "${files[$index]}" || exit 1
+  done
+  for ((index=0; index<${#files[@]}; index++)); do
+    [[ "$(git --literal-pathspecs ls-files --stage -- "${files[$index]}")" == "$(cat "$stage_root/index-$index")" ]] || exit 1
+  done
+  index_attempted=true
+  git --literal-pathspecs add -- "${files[@]}" || exit 1
+  prefix="$(git rev-parse --show-prefix)" || exit 1
+  [[ "$(git show ":$prefix$release_version_file")" == "$release_new_version" ]] || exit 1
+  if [[ "$sync_with_package_json" == true ]]; then
+    [[ "$(git show ":$prefix$release_package_json" | read_manifest_version -)" == "$release_new_version" ]] || exit 1
+  fi
+  complete=true
+)
 
 # Function to create the version commit described by the prepared release plan
 commit_release_version() {
   release_stage="creating the version commit"
+  local prefix exclusions=()
+  [[ "$(git rev-parse HEAD)" == "$release_plan_head" && "$(git branch --show-current)" == "$release_start_branch" ]] ||
+    abort "Release HEAD or branch changed before the version commit."
+  prefix="$(git rev-parse --show-prefix)" || abort "Could not inspect the release directory."
+  exclusions+=(":(top,literal,exclude)$prefix$release_version_file")
+  if [[ "$sync_with_package_json" == true ]]; then
+    exclusions+=(":(top,literal,exclude)$prefix$release_package_json")
+  fi
+  git diff --cached --quiet -- ':(top,glob)**' "${exclusions[@]}" ||
+    abort "Index contains changes outside the selected version files; preserved for inspection."
   git commit \
     -m "bump version to $release_new_version" \
     -m "Automatic version bump to $release_new_version" ||
@@ -1685,7 +1986,8 @@ execute_release_plan() {
   release_tag_name="${release_tag_prefix}$release_new_version"
   trap 'release_exit_handler "$?"' EXIT
 
-  stage_release_files
+  release_stage="staging version files"
+  stage_release_files || abort "Failed to stage version files safely."
   commit_release_version
   create_release_refs
   publish_release_refs
@@ -1707,22 +2009,27 @@ run_release() {
   fi
 
   prepare_release_plan "$requested_type"
-  local planned_head
+  local planned_head planned_snapshot planned_target planned_remote_dev planned_remote_main
   planned_head="$(git rev-parse HEAD)" || abort "Could not resolve release HEAD."
+  release_plan_head="$planned_head"
+  planned_snapshot="$(version_plan_snapshot)" || abort "Could not snapshot the release inputs."
+  planned_target="$release_version_file|$release_package_json|$release_tag_prefix"
+  planned_remote_dev="$release_initial_remote_develop_sha"
+  planned_remote_main="$release_initial_remote_master_sha"
   run_hook "pre-bump"
-  if [[ -n "${selected_package:-}" ]]; then
-    [[ "$(git rev-parse HEAD)" == "$planned_head" && "$(git branch --show-current)" == "$release_start_branch" ]] ||
-      abort "Pre-bump hook changed the release HEAD or branch."
-    [[ -z "$(git status --porcelain)" ]] || abort "Pre-bump hook changed the working tree."
-    local planned_target="$release_version_file|$release_package_json|$release_tag_prefix"
-    resolve_release_target
-    [[ "$planned_target" == "$release_version_file|$release_package_json|$release_tag_prefix" ]] ||
-      abort "Pre-bump hook changed the package target."
-    preflight_release "$release_new_version" "$release_develop_branch" "$release_master_branch"
-    if [[ "$release_is_hotfix" == "true" ]]; then
-      validate_hotfix_release
-    fi
-  fi
+  [[ "$(git rev-parse HEAD)" == "$planned_head" && "$(git branch --show-current)" == "$release_start_branch" ]] ||
+    abort "Pre-bump hook changed the release HEAD or branch."
+  [[ -z "$(git status --porcelain)" ]] || abort "Pre-bump hook changed the working tree."
+  resolve_release_target
+  [[ "$planned_target" == "$release_version_file|$release_package_json|$release_tag_prefix" &&
+     "$(version_plan_snapshot)" == "$planned_snapshot" ]] || abort "Pre-bump hook changed the release inputs."
+  read_version_sources
+  preflight_release "$release_new_version" "$release_develop_branch" "$release_master_branch"
+  [[ "$planned_remote_dev" == "$release_initial_remote_develop_sha" &&
+     "$planned_remote_main" == "$release_initial_remote_master_sha" ]] ||
+    abort "Origin release refs changed after the release plan."
+  assert_version_tags_unchanged
+  if [[ "$release_is_hotfix" == true ]]; then validate_hotfix_release; fi
   execute_release_plan
 }
 

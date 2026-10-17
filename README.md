@@ -244,15 +244,15 @@ to `dev`.
 Bumpster supports optional synchronization between the `VERSION` file and
 `package.json`. When enabled, a release command synchronizes only the root
 `version` field; nested fields named `version` are left unchanged. If the root
-field is missing, it is added.
+field is missing, it is added only after explicit selection of another version source.
 
 Synchronization requires an executable Node.js installation. Bumpster parses
 and validates the JSON before any release mutation, preserves the existing
 indentation style, line ending and file permissions, then replaces
 `package.json` atomically through a unique temporary file in the same directory.
 Invalid JSON or a non-string root `version` aborts the release without changing
-`VERSION` or `package.json`. If `package.json` is not found, synchronization is
-skipped with a log message.
+`VERSION` or `package.json`. When synchronization is enabled, a missing
+`package.json` is a release error.
 
 **Example Configuration**:
 
@@ -622,6 +622,32 @@ The global configuration file `~/.bumpsterrc`, project-level `.bumpsterrc`
 files, and versioned backup directories are intentionally outside that path.
 Remove them separately only after checking that they are no longer needed.
 
+## Canonical version selection
+
+Without a configuration file, releases use the default branches without creating
+configuration. Use `--create-local-config` to create it explicitly.
+
+Release preflight now confirms the last published tag of the selected product
+against `origin` and its release history. CLI tags (`vX.Y.Z`) and each package's
+namespaced tags are independent. If participating files differ from that tag,
+the release stops before changing files; matching files ahead of the tag also
+require explicit selection. Choose the **base for the bump** with:
+
+```sh
+bumpster --patch --version-source tag:v1.3.0
+bumpster --package website --patch --version-source version-file
+```
+
+Sources are `version-file`, `package-json` (only for a participating manifest),
+and `tag:NAME` (only the confirmed tag). The first release in a new namespace
+requires an explicit file source. Unsafe paths, invalid values/JSON, conflicting
+or unpublished local tags, shallow/ambiguous history, and version downgrades
+cannot be bypassed. Missing JSON `version` fields require an explicit other
+source; missing files are not created. Normal CLI releases without JSON
+synchronization do not require Node.js. This is a stricter contract than earlier
+file-only releases. See the [canonical version contract](docs/CLI_CONTRACT.md#canonical-release-version)
+for history, hooks, status, and file recovery rules.
+
 ## Independent package releases
 
 Select one package explicitly from the repository root:
@@ -644,7 +670,8 @@ Commit `.bumpster/packages/ui.json` with exactly these fields:
 Package mode requires Node.js and tracked regular files below the repository
 root. It updates only the selected version file and manifest, creates `ui/vX.Y.Z`,
 and preserves the existing atomic Git, hotfix, and return-to-development flow.
-Without `--package`, single-product behavior is unchanged. Dependencies and
+Without `--package`, the ordinary product is selected; the canonical-version
+checks still apply. Dependencies and
 lockfiles need a separate reviewed update; npm publication belongs to separate CI.
 See the [package CLI contract](docs/CLI_CONTRACT.md#independent-package-releases)
 for path validation, profile collisions, hooks, and the consumer update plan.
