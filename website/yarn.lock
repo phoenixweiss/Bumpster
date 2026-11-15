@@ -138,10 +138,10 @@
   resolved "https://registry.yarnpkg.com/@fontsource-variable/nunito-sans/-/nunito-sans-5.3.0.tgz#7d24934e62294f89f66baf35a726b360bb365dfa"
   integrity sha512-Vk1PSfckNDwgw2yGcsvJP3o/0zEW8Rp6KzbD8Ql/6iRHQshnhhAjt+cSIfAUyp5vQuSlleGHFW2LfYaaex0diw==
 
-"@fontsource/space-mono@5.3.0":
+"@fontsource/ibm-plex-mono@5.3.0":
   version "5.3.0"
-  resolved "https://registry.yarnpkg.com/@fontsource/space-mono/-/space-mono-5.3.0.tgz#6e45e0284066e6f637c35bd7af0469ce13817c60"
-  integrity sha512-FrpBMOVWn3PRdRHlrZWC55X3kZG/2BTH7SM5ZyS/bky3iKya2BturI5lk+t0RoDQL2JyHzURsVq/EisCsxpI5A==
+  resolved "https://registry.yarnpkg.com/@fontsource/ibm-plex-mono/-/ibm-plex-mono-5.3.0.tgz#1879699d104602d5331e28e103f33c3b1b766b17"
+  integrity sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==
 
 "@formatjs/ecma402-abstract@2.3.6":
   version "2.3.6"

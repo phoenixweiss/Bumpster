@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@fontsource-variable/nunito-sans": "5.3.0",
-    "@fontsource/space-mono": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
     "vue": "3.5.40"
   },
   "devDependencies": {

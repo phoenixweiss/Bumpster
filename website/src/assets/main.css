@@ -42,7 +42,7 @@
   --navy: var(--color-base-content);
   --green: var(--color-success);
   --orange: var(--color-warning);
-  --mono: "Space Mono", "SFMono-Regular", Consolas, monospace;
+  --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 * {

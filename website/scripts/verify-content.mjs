@@ -25,6 +25,12 @@ import {
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const websiteRoot = resolve(scriptDirectory, "..");
 const repositoryRoot = resolve(websiteRoot, "..");
+const monoFontRoot = join(
+  websiteRoot,
+  "node_modules",
+  "@fontsource",
+  "ibm-plex-mono",
+);
 
 function fail(message) {
   throw new Error(message);
@@ -95,6 +101,9 @@ const [
   englishIndex,
   russianIndex,
   manifestSource,
+  websiteMainSource,
+  websiteStyles,
+  monoFontMetadataSource,
   terminalLogo,
 ] = await Promise.all([
   readCliHelp(),
@@ -111,8 +120,34 @@ const [
   readRepositoryFile("website/index.html"),
   readRepositoryFile("website/ru/index.html"),
   readRepositoryFile("website/public/site.webmanifest"),
+  readRepositoryFile("website/src/main.js"),
+  readRepositoryFile("website/src/assets/main.css"),
+  readFile(join(monoFontRoot, "metadata.json"), "utf8"),
   readRepositoryFile("lib/BUMPSTER_LOGO.ASCII"),
 ]);
+
+const monoFontMetadata = JSON.parse(monoFontMetadataSource);
+assert(
+  monoFontMetadata.family === "IBM Plex Mono" &&
+    monoFontMetadata.subsets.includes("cyrillic") &&
+    monoFontMetadata.weights.includes(400) &&
+    monoFontMetadata.weights.includes(700),
+  "Website monospace font must provide Cyrillic in regular and bold weights.",
+);
+assertIncludes(
+  websiteStyles,
+  '--mono: "IBM Plex Mono"',
+  "Website monospace token differs from the bundled Cyrillic font",
+);
+for (const subset of ["cyrillic", "latin"]) {
+  for (const weight of [400, 700]) {
+    assertIncludes(
+      websiteMainSource,
+      `@fontsource/ibm-plex-mono/${subset}-${weight}.css`,
+      "Website is missing a required monospace font subset",
+    );
+  }
+}
 
 assert(
   brandLockup === websiteLockup,
