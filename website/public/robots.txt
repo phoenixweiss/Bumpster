@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://phoenixweiss.github.io/Bumpster/sitemap.xml
+Sitemap: https://bumpster.phoenixweiss.me/sitemap.xml

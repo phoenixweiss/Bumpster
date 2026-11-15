@@ -5,7 +5,7 @@
 [![CI](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/phoenixweiss/Bumpster?display_name=tag&sort=semver)](https://github.com/phoenixweiss/Bumpster/releases/latest)
 
-[WEBSITE](https://phoenixweiss.github.io/Bumpster/) ·
+[WEBSITE](https://bumpster.phoenixweiss.me/) ·
 [RUSSIAN VERSION](README_RU.md)
 
 **Bumpster** is a powerful utility for automating semantic version management. The name combines *"bump"* and *"buster"*, highlighting its ability to quickly and efficiently handle version bumps for your software projects.
@@ -596,7 +596,7 @@ English is the canonical language for source comments, CLI output, configuration
 examples, `README.md`, `CHANGELOG.md`, GitHub Release notes, and the primary
 website. Russian is the first maintained additional language in
 `README_RU.md` and the
-[Russian website locale](https://phoenixweiss.github.io/Bumpster/ru/).
+[Russian website locale](https://bumpster.phoenixweiss.me/ru/).
 
 Write user-facing documentation in English first, then update the Russian
 version with the same meaning in the same change. Future translations must use

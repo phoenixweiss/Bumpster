@@ -6,7 +6,7 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const websiteRoot = resolve(scriptDirectory, "..");
 const repositoryRoot = resolve(websiteRoot, "..");
 const distRoot = join(websiteRoot, "dist");
-const assetPrefix = "/Bumpster/";
+const assetPrefix = "/";
 
 function fail(message) {
   throw new Error(message);

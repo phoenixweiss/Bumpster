@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, follow" />
+    <meta http-equiv="refresh" content="0; url=/" />
+    <link rel="canonical" href="https://bumpster.phoenixweiss.me/" />
+    <title>Redirecting to Bumpster</title>
+    <script>
+      const destination = new URL("/", window.location.origin);
+      destination.search = window.location.search;
+      destination.hash = window.location.hash;
+      window.location.replace(destination.href);
+    </script>
+  </head>
+  <body>
+    <p><a href="/">Continue to Bumpster</a></p>
+  </body>
+</html>

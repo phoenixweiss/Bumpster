@@ -114,7 +114,7 @@ try {
     chromePath: process.env.CHROME_PATH,
   });
 
-  for (const path of ["/Bumpster/", "/Bumpster/ru/"]) {
+  for (const path of ["/", "/ru/"]) {
     const url = `http://127.0.0.1:${address.port}${path}`;
     const reports = [];
 

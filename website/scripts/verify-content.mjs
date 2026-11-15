@@ -44,6 +44,10 @@ function assertIncludes(value, expected, message) {
   assert(value.includes(expected), `${message}: ${expected}`);
 }
 
+function assertNotIncludes(value, unexpected, message) {
+  assert(!value.includes(unexpected), `${message}: ${unexpected}`);
+}
+
 function assertSameSet(actual, expected, message) {
   const actualValues = [...actual].sort();
   const expectedValues = [...expected].sort();
@@ -101,6 +105,10 @@ const [
   englishIndex,
   russianIndex,
   manifestSource,
+  robotsSource,
+  sitemapSource,
+  englishAliasSource,
+  englishAliasSlashSource,
   websiteMainSource,
   websiteStyles,
   monoFontMetadataSource,
@@ -120,6 +128,10 @@ const [
   readRepositoryFile("website/index.html"),
   readRepositoryFile("website/ru/index.html"),
   readRepositoryFile("website/public/site.webmanifest"),
+  readRepositoryFile("website/public/robots.txt"),
+  readRepositoryFile("website/public/sitemap.xml"),
+  readRepositoryFile("website/public/en.html"),
+  readRepositoryFile("website/public/en/index.html"),
   readRepositoryFile("website/src/main.js"),
   readRepositoryFile("website/src/assets/main.css"),
   readFile(join(monoFontRoot, "metadata.json"), "utf8"),
@@ -165,13 +177,23 @@ for (const documentation of [readme, readmeRu]) {
     "README is missing the canonical Bumpster lockup",
   );
 }
+assertIncludes(
+  readme,
+  "https://bumpster.phoenixweiss.me/",
+  "README is missing the canonical website URL",
+);
+assertIncludes(
+  readmeRu,
+  "https://bumpster.phoenixweiss.me/ru/",
+  "Russian README is missing the canonical website URL",
+);
 
 const sharedWebsiteBrandReferences = [
-  "/Bumpster/favicon.svg",
-  "/Bumpster/favicon-32.png",
-  "/Bumpster/favicon-16.png",
-  "/Bumpster/apple-touch-icon.png",
-  "https://phoenixweiss.github.io/Bumpster/og-image.png",
+  "/favicon.svg",
+  "/favicon-32.png",
+  "/favicon-16.png",
+  "/apple-touch-icon.png",
+  "https://bumpster.phoenixweiss.me/og-image.png",
   'content="1200"',
   'content="630"',
   'content="summary_large_image"',
@@ -187,18 +209,94 @@ for (const indexSource of [englishIndex, russianIndex]) {
   }
 }
 
+for (const [indexSource, canonicalUrl] of [
+  [englishIndex, "https://bumpster.phoenixweiss.me/"],
+  [russianIndex, "https://bumpster.phoenixweiss.me/ru/"],
+]) {
+  assertIncludes(
+    indexSource,
+    `rel="canonical" href="${canonicalUrl}"`,
+    "Website locale is missing its canonical URL",
+  );
+  for (const alternateUrl of [
+    "https://bumpster.phoenixweiss.me/",
+    "https://bumpster.phoenixweiss.me/ru/",
+  ]) {
+    assertIncludes(
+      indexSource,
+      alternateUrl,
+      "Website locale is missing a localized alternate URL",
+    );
+  }
+}
+
+const publicWebsiteSources = [
+  englishIndex,
+  russianIndex,
+  manifestSource,
+  robotsSource,
+  sitemapSource,
+  englishAliasSource,
+  englishAliasSlashSource,
+];
+for (const source of publicWebsiteSources) {
+  assertNotIncludes(
+    source,
+    "https://phoenixweiss.github.io/Bumpster/",
+    "Website source contains the previous public URL",
+  );
+  assertNotIncludes(
+    source,
+    "/Bumpster/",
+    "Website source contains the previous project base",
+  );
+}
+
+assert(
+  englishAliasSource === englishAliasSlashSource,
+  "English aliases must use the same redirect document.",
+);
+for (const reference of [
+  'rel="canonical" href="https://bumpster.phoenixweiss.me/"',
+  "window.location.replace(destination.href)",
+  "window.location.search",
+  "window.location.hash",
+  'content="noindex, follow"',
+]) {
+  assertIncludes(
+    englishAliasSource,
+    reference,
+    "English alias is missing redirect behavior",
+  );
+}
+
+assertIncludes(
+  robotsSource,
+  "Sitemap: https://bumpster.phoenixweiss.me/sitemap.xml",
+  "Robots file points to the wrong sitemap",
+);
+assertSameSet(
+  new Set(
+    [...sitemapSource.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) => url),
+  ),
+  new Set([
+    "https://bumpster.phoenixweiss.me/",
+    "https://bumpster.phoenixweiss.me/ru/",
+  ]),
+  "Sitemap locale URLs differ from the public website",
+);
+
 const manifest = JSON.parse(manifestSource);
 assert(
-  manifest.background_color === "#f3f0ea" && manifest.theme_color === "#941e3d",
-  "Web manifest colors differ from the approved brand palette.",
+  manifest.start_url === "/" &&
+    manifest.scope === "/" &&
+    manifest.background_color === "#f3f0ea" &&
+    manifest.theme_color === "#941e3d",
+  "Web manifest root paths or colors differ from the approved configuration.",
 );
 assertSameSet(
   new Set(manifest.icons.map(({ src }) => src)),
-  new Set([
-    "/Bumpster/favicon.svg",
-    "/Bumpster/icon-192.png",
-    "/Bumpster/icon-512.png",
-  ]),
+  new Set(["/favicon.svg", "/icon-192.png", "/icon-512.png"]),
   "Web manifest icon list differs from the branded icon set.",
 );
 

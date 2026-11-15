@@ -5,7 +5,7 @@
 [![CI](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/phoenixweiss/Bumpster/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/phoenixweiss/Bumpster?display_name=tag&sort=semver)](https://github.com/phoenixweiss/Bumpster/releases/latest)
 
-[САЙТ](https://phoenixweiss.github.io/Bumpster/ru/) ·
+[САЙТ](https://bumpster.phoenixweiss.me/ru/) ·
 [ENGLISH VERSION](README.md)
 
 **Bumpster** — это мощная утилита для автоматизации управления семантическими версиями. Название объединяет слова *"bump"* и *"buster"*, подчеркивая способность утилиты быстро и эффективно обновлять версии ваших проектов.
@@ -597,7 +597,7 @@ Checksum подтверждает байты загруженного файла
 конфигурации, `README.md`, `CHANGELOG.md`, GitHub Release notes и основной версии
 сайта. Русский — первая поддерживаемая дополнительная локализация в
 `README_RU.md` и
-[русской версии сайта](https://phoenixweiss.github.io/Bumpster/ru/).
+[русской версии сайта](https://bumpster.phoenixweiss.me/ru/).
 
 Пользовательскую документацию сначала формулируют на английском, а затем в том
 же изменении переносят тот же смысл в русскую версию. Будущие переводы должны

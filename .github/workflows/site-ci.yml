@@ -94,6 +94,8 @@ jobs:
 
           for required_file in \
             dist/index.html \
+            dist/en.html \
+            dist/en/index.html \
             dist/ru/index.html \
             dist/apple-touch-icon.png \
             dist/favicon-16.png \
@@ -117,8 +119,22 @@ jobs:
             exit 1
           fi
 
-          grep -Fq '/Bumpster/assets/' dist/index.html
-          grep -Fq '/Bumpster/assets/' dist/ru/index.html
+          grep -Fq '/assets/' dist/index.html
+          grep -Fq '/assets/' dist/ru/index.html
+          grep -Fq 'window.location.replace' dist/en.html
+          grep -Fq 'window.location.replace' dist/en/index.html
+
+          for legacy_reference in \
+            '/Bumpster/assets/' \
+            '/Bumpster/favicon' \
+            'https://phoenixweiss.github.io/Bumpster/'
+          do
+            if grep -R -F -n "$legacy_reference" dist; then
+              printf 'Website output still contains a legacy reference: %s\n' \
+                "$legacy_reference" >&2
+              exit 1
+            fi
+          done
 
       - name: Verify built Bumpster version
         run: yarn run version:check

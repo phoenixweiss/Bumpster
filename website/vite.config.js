@@ -34,7 +34,7 @@ if (
 }
 
 export default defineConfig({
-  base: "/Bumpster/",
+  base: "/",
   define: {
     "import.meta.env.BUMPSTER_VERSION": JSON.stringify(bumpsterVersion),
   },
