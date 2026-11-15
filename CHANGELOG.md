@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [Website 0.0.2] - 2026-11-16
+
+### Added
+
+- English `/en` and `/en/` aliases redirect to the canonical root locale while
+  preserving query parameters and fragments.
+
+### Changed
+
+- The public website now uses `bumpster.phoenixweiss.me` with root-relative
+  assets and matching canonical, social, sitemap, and manifest URLs.
+- Monospace interface labels and code examples now use IBM Plex Mono with
+  dedicated Latin and Cyrillic font files.
+
 ## [1.4.0] - 2026-10-18
 
 ### Changed
@@ -413,6 +427,7 @@ standalone Bumpster runtime asset.
   handling.
 
 [Unreleased]: https://github.com/phoenixweiss/Bumpster/compare/v1.4.0...HEAD
+[Website 0.0.2]: https://github.com/phoenixweiss/Bumpster/compare/website/v0.0.1...website/v0.0.2
 [1.4.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/phoenixweiss/Bumpster/compare/v1.2.2...v1.2.3
